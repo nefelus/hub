@@ -1,0 +1,48 @@
+{
+	"name": "hub",
+	"version": "1.1.4",
+	"author": "",
+	"description": "",
+	"company": "",
+	"website": "",
+	"package": null,
+	"startup": "hub.js",
+	"execute": null,
+	"extract": false,
+	"output": "hub.jx",
+	"files": [
+		"hub.js",
+                "lib/clouds.js",
+                "lib/dict.js",
+		"lib/dns.js",
+                "lib/images.js",
+		"lib/logging.js",
+                "lib/machines.js",
+		"lib/quotas.js",
+                "lib/quotashares.js",
+                "lib/secgroups.js",
+                "lib/shares.js",
+                "lib/toolapps.js",
+		"lib/tools.js",
+		"package.json",
+		"sqlTemplates.js"
+	],
+	"assets": [
+	],
+	"preInstall": [
+                    "jx install nconf",
+                    "jx install socket.io@0.9.16",
+                    "jx install socket.io-client@0.9.16",
+                    "jx install async",
+                    "jx install aws-sdk",
+                    "jx install mkdirp",
+                    "jx install node-uuid",
+                    "jx install mysql@2.5.1",
+                    "jx install request@~2.42.0",
+                    "jx install lodash@~2.4.1",
+                    "jx install time",
+                    "jx install tmp"
+	],
+	"library": true,
+	"fs_reach_sources": true
+}
