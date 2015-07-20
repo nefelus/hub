@@ -1,0 +1,149 @@
+{
+  "hubType" : "development",
+  "hub" : {
+     "port" : 8585
+   , "host" : "127.0.0.1"
+   , "ssl"  : {
+        "key" : ""
+      , "cert" : ""
+      , "ca" : ""
+      , "masterPack" : ""
+     }
+   , "sessionsPath" : "/var/run/nefelus/hub"
+   , "maxRunningJobsAllowed" : 5
+   , "skipCycles" : 8
+  }, 
+  "adminEmail" : "kosmasgiannis@gmail.com",
+  "timezone" : "Asia/Tokyo",
+  "setloginuser" : false,
+  "database" : {
+     "host" : "gitlab.nefelus.com"
+   , "port" : 3306
+   , "user" : "nefelus"
+   , "password" : "cumulus"
+   , "database" : "NEFELUS_PILOT_DB"
+   , "connectTimeout"  : 30000
+   , "acquireTimeout"  : 30000
+   , "queryinterval" : 15000
+  },
+  "vncLocalOnly" : true,
+  "xterm" : "NO",
+  "staticUserData" : {
+    "TIMEZONE" : "UTC",
+    "LOGO_BIG.png" : "https://www.nefelus.com/nefelus.png",
+    "LOGO_SMALL.png" : "https://www.nefelus.com/nefelus_small.png",
+    "LOGO_NEFELUS_BIG.png" : "https://www.nefelus.com/nefelus.png",
+    "LOGO_NEFELUS_SMALL.png" : "https://www.nefelus.com/nefelus_small.png"
+  },
+  "aws" : {
+     "ec2" : {
+        "region" : "us-east-1"
+      , "endPoint" : {}
+      , "accessKeyId" : "AKIAJTNMYZXUHGQTYT4Q"
+      , "secretAccessKey" : "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"
+      , "accountId" : "498253926375"
+      , "keyName" : "nefelus1-keypair"
+      , "securityGroup" : "master"
+     }
+   , "s3" : {
+        "region" : "us-east-1"
+      , "serverSideEncryption" : true
+      , "s3ForcePathStyle" : false
+      , "endPoint" : {}
+      , "accessKeyId" : "AKIAJTNMYZXUHGQTYT4Q"
+      , "secretAccessKey" : "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"
+      , "accountId" : "498253926375"
+      , "bucket" : "clients-space-1-dev"
+      , "vendorBucket" : "nefelus-vendor-tools-dev"
+     }
+   , "dnsPostprocess" : "route53"
+   , "values_for_dnsPostprocess" : "none,route53,dnsresolve,dnstransform,dnsmap"
+   , "dnsresolve" : {
+        "domainName" : "nefelus.com"
+     }
+   , "dnsmap" : {
+        "map" : {"100.100.100.100" : "www.nefelus.com", "200.200.200.200" : "web.nefelus.com"}
+     }
+   , "dnstransform" : {
+        "matches" : [ "/[.]/g", "/^/", "/$/" ]
+      , "values"  : [ "-", "w-", "." ]
+      , "domainName" : "nefelus.com"
+     }
+   , "route53" : {
+        "hostedZone" : "Z79F3OD48EC5Q"
+      , "providerDomainName" : ".amazonaws.com"
+      , "domainName" : "-m.nefelus.com"
+     }
+   , "ec2_max_tries" : 60
+   , "ec2_timeout" : 10000
+  },
+  "nefelus" : {
+     "username" : "nefelus"
+   , "masterDebug" : true
+   , "heartbeatInterval" : 60000
+   , "x11IdleTimeout" : 0
+   , "homeBlacklistPatterns" : [ "!/home/nefelus/.Xauthority"
+                               , "!/home/nefelus/.bashrc*"
+                               , "!/home/nefelus/.twmrc"
+                               , "!/home/nefelus/.profile"
+                               , "!/home/nefelus/.cshrc"
+                               , "!/home/nefelus/.tcshrc"
+                               , "!/home/nefelus/.vnc/*"
+                               , "!/home/nefelus/.ssh/*"
+                               , "!/home/nefelus/tool/**"
+                               , "!/home/nefelus/**/*.lock"
+                               , "!/home/nefelus/.npm/*"
+                               , "!/home/nefelus/.jx/*"
+                               , "!/home/nefelus/.node-gyp/*"
+                               , "!/home/nefelus/.fontconfig/*"
+                               , "!/mnt/ephemeral/nefelus/.Xauthority"
+                               , "!/mnt/ephemeral/nefelus/.bashrc*"
+                               , "!/mnt/ephemeral/nefelus/.twmrc"
+                               , "!/mnt/ephemeral/nefelus/.profile"
+                               , "!/mnt/ephemeral/nefelus/.cshrc"
+                               , "!/mnt/ephemeral/nefelus/.tcshrc"
+                               , "!/mnt/ephemeral/nefelus/.vnc/*"
+                               , "!/mnt/ephemeral/nefelus/.ssh/*"
+                               , "!/mnt/ephemeral/nefelus/tool/**"
+                               , "!/mnt/ephemeral/nefelus/**/*.lock"
+                               , "!/mnt/ephemeral/nefelus/.npm/*"
+                               , "!/mnt/ephemeral/nefelus/.jx/*"
+                               , "!/mnt/ephemeral/nefelus/.node-gyp/*"
+                               , "!/mnt/ephemeral/nefelus/.fontconfig/*"
+                               , "!/mnt/nefelus/.Xauthority"
+                               , "!/mnt/nefelus/.bashrc*"
+                               , "!/mnt/nefelus/.twmrc"
+                               , "!/mnt/nefelus/.profile"
+                               , "!/mnt/nefelus/.cshrc"
+                               , "!/mnt/nefelus/.tcshrc"
+                               , "!/mnt/nefelus/.vnc/*"
+                               , "!/mnt/nefelus/.ssh/*"
+                               , "!/mnt/nefelus/tool/**"
+                               , "!/mnt/nefelus/.npm/*"
+                               , "!/mnt/nefelus/.jx/*"
+                               , "!/mnt/nefelus/.node-gyp/*"
+                               , "!/mnt/nefelus/**/*.lock"
+                               , "!/mnt/nefelus/.fontconfig/*"
+                               ]
+   , "logURL" : { "port" : "8998", "protocol" : "http"}
+   , "vncURL" : { "port" : "8997", "protocol" : "http"}
+   , "cmdURL" : { "port" : "8996", "protocol" : "http"}
+  },
+  "emailTemplates" : [
+     {
+       "name" : "session-status",
+       "source" : "session-status.html",
+       "subject" : "Status report for session {{ID}}",
+       "context" : {
+                     "firstname" : "",
+                     "ID" : "",
+                     "toolname" : "",
+                     "blockname" : "",
+                     "projectname" : "",
+                     "started" : "",
+                     "completed" : "",
+                     "status" : ""
+       }
+     }
+  ]
+}

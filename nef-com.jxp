@@ -1,0 +1,32 @@
+{
+	"name": "nef-com",
+	"version": "1.0",
+	"author": "",
+	"description": "",
+	"company": "",
+	"website": "",
+	"package": null,
+	"startup": "nef-com.js",
+	"execute": null,
+	"extract": false,
+	"output": "nef-com.jx",
+	"files": [
+		"nef-com.js",
+		"lib/tools.js",
+		"package.json"
+	],
+	"assets": [
+	],
+        "preInstall": [
+                    "jx install nconf",
+                    "jx install aws-sdk",
+                    "jx install async",
+                    "jx install commander",
+                    "jx install cli-table",
+                    "jx install socket.io-client@0.9.16",
+                    "jx install lodash@~2.4.1",
+        ],
+	"native": false,
+	"library": true,
+	"fs_reach_sources": true
+}

@@ -1,0 +1,17 @@
+###Version 1.0
+  - Send email notification upon session termination
+  - Use a pool of connections to serve SQL updates
+  - Set runningDir as well as commandFile to pass it to tool script
+  - Reload config on SIGHUP
+  - Dates are stored in "YYYY/MM/DD HH:MM:SS" format, 24h clock.
+  - register machine's address on route53 under nefelus subdomain
+  - Put sessionId as instance Name (Tag)
+  - pass aws ids to instance
+  - set machineType in UserData (set in RunInstances)
+  - push data from a running session to S3
+  - cancel a running session
+  - Health checks during instance setup, restart on unexpected termination
+  - VNC, PROMPT and LOG viewers are set with separate message.
+  - set sessionId on instance metadata (Tag)
+  - send X11idle timeout
+  - get heartbeats from master with load data
