@@ -1899,15 +1899,15 @@ var io;
 if (sslOptions !== false) {
   logger.log('SSL enabled');
   server = https.createServer(sslOptions);
+  sslOptions['destroy buffer size'] = Infinity;
   io = require('socket.io').listen(server, sslOptions);
 } else {
   logger.log('SSL not enabled');
   server = http.createServer();
-  io = require('socket.io').listen(server);
+  io = require('socket.io').listen(server, {'destroy buffer size': Infinity});
 }
 
 //var io = require('socket.io').listen(hubPort);
-
 //server.listen(hubPort, hubHost); // Does not work!
 server.listen(hubPort);
 
