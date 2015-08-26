@@ -978,9 +978,14 @@ function startMaster(ticket, cb) {
   var runasToolShares = null;
   var toolXtermSupport = toolapps.getXtermSupport(sid.toolId);
   var toolMountPoint = toolapps.getMountPoint(sid.toolId);
+  var toolAdditionalMountPoints = toolapps.getAdditionalMountPoints(sid.toolId);
 
   if (toolMountPoint !== 0) {
     allIds.push(toolMountPoint);
+  }
+
+  if (toolAdditionalMountPoints !== 0) {
+    allIds.push(toolAdditionalMountPoints.split(','));
   }
 
   var dataTypes;
@@ -1000,10 +1005,16 @@ function startMaster(ticket, cb) {
   var runasSid = nt.parseSessionId(ticket.req.runas);
   if (runasSid !== '') {
     var runasToolMountPoint = toolapps.getMountPoint(runasSid.toolId);
+    var runasToolAdditionalMountPoints = toolapps.getAdditionalMountPoints(runasSid.toolId);
 
     if (runasToolMountPoint !== 0) {
       allIds.push(runasToolMountPoint);
     }
+
+    if (runasToolAdditionalMountPoints !== 0) {
+      allIds.push(runasToolAdditionalMountPoints.split(','));
+    }
+
     dataTypes.forEach(function(dt) {
       Ids = quotashares.permits.getPermittedResources({company:runasSid.companyId, user:runasSid.clientId, project:runasSid.projectId}, dt, (dt !== "USER_DATA"));
       if (Ids) {
