@@ -705,6 +705,7 @@ function updateStatus(sqlpool, id, mystatus, keys, values, cb) {
     case 'ERROR':
     case 'ENDED':
     case 'CANCELED':
+    case 'TERMINATED':
     case 'WARNING':
       q = 'STATUS = ?, COMPLETED = ?, UPDATED = ? ';
       params = [mystatus, now , now];
