@@ -2750,8 +2750,6 @@ function handleDownloadFinished(socket, sessionId, ticket, msg) {
     var machineCount = Tickets[ticket].getRequest('machineCount') || '1';
     Tickets[ticket].set('sessionStatus', 'execute');
     masterTicket = dupTicket(reqID);
-    //var sid = nt.parseSessionId(sessionId);
-    //var licenseManager = toolapps.getLicenseManager(sid.toolId);
     var licenseManager = Tickets[ticket].getRequest('licenseManager') || '';
     mesg = {
       'sessionId' : sessionId,
