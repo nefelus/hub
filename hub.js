@@ -485,6 +485,7 @@ function Ticket(id) {
   this.logConsole = null;
   this.vncConsole = null;
   this.loginuser = 'nefelus';
+  this.useradmin = '';
 
   this.done = {
     'preinit' : false,
@@ -966,6 +967,18 @@ function restartMaster(instanceId, sessionId) {
   }
 }
 
+function ro2rw(s) {
+  var m = s.match(/(^\s*ro\s*,*)|(\s*,*ro\s*$)|(\s*,\s*ro\s*,\s*)/);
+
+  if (m) {
+    var newstr = m[0].replace(/ro/,'rw');
+    var r = s.replace(/(^\s*ro\s*,*)|(\s*,*ro\s*$)|(\s*,\s*ro\s*,\s*)/g, newstr);
+    return r;
+  }
+  return s;
+}
+
+
 function startMaster(ticket, cb) {
   var userData = {};
   for (var sudKey in staticUserData) {
@@ -1002,6 +1015,17 @@ function startMaster(ticket, cb) {
     }
   });
 
+  var adminIds = [];
+  // Get shares in order to allow company admin to have write access to companies SHARED_DATA mounts.
+  if (ticket.useradmin == 'C') {
+    adminIds = quotashares.permits.getPermittedResources({company:sid.companyId, user:sid.clientId, project:sid.projectId}, 'SHARED_DATA', true );
+    if (adminIds) {
+      adminIds=adminIds['SHARED_DATA'];
+    } else {
+      adminIds=[];
+    }
+  }
+
   var runasSid = nt.parseSessionId(ticket.req.runas);
   if (runasSid !== '') {
     var runasToolMountPoint = toolapps.getMountPoint(runasSid.toolId);
@@ -1029,14 +1053,22 @@ function startMaster(ticket, cb) {
   projectShares.forEach(function(n, i) {
     var notfound = true;
     var j;
+    var mntp=n;
+
+    if (ticket.useradmin == 'C') { // Allow company admin to have write access to companies SHARED_DATA mounts.
+      if (adminIds.indexOf(''+n.id) !== -1) {
+        mntp.mountParams = ro2rw(mntp.mountParams);
+      }
+    }
+
     for (j=0; j<allShares.length; j++) {
-      if ((n.fstype == allShares[j].fstype) && (n.location == allShares[j].location) &&
-          (n.mountPoint == allShares[j].mountPoint) && (n.mountParams == allShares[j].mountParams)) {
+      if ((mntp.fstype == allShares[j].fstype) && (mntp.location == allShares[j].location) &&
+          (mntp.mountPoint == allShares[j].mountPoint) && (mntp.mountParams == allShares[j].mountParams)) {
         notfound = false;
       }
     }
     if (notfound) {
-      allShares.push(n);
+      allShares.push(mntp);
     }
   });
 
@@ -1708,6 +1740,7 @@ var dispatcher = function dispatcher () {
                               var XDisplay = records[i].DISPLAY || null;
                               var XResolution = records[i].RESOLUTION || null;
                               var loginuser = records[i].LOGIN_NAME || 'nefelus';
+                              var useradmin = records[i].USER_ADMIN || '';
                               var licenseManager = records[i].LICENSE_MANAGER || '';
                               var t = new Ticket(hubreqid);
                               t.setRequest('sessionId', sessionId);
@@ -1721,6 +1754,7 @@ var dispatcher = function dispatcher () {
                               t.setRequest('jobType', jobType);
                               t.set('XDisplay', XDisplay);
                               t.set('XResolution', XResolution);
+                              t.set('useradmin', useradmin);
                               if (setloginuser) {
                                 t.set('loginuser', loginuser);
                               }
