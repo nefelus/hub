@@ -16,6 +16,7 @@
   "adminEmail" : "kosmasgiannis@gmail.com",
   "timezone" : "Asia/Tokyo",
   "setloginuser" : false,
+  "setsecgroups" : false,
   "database" : {
      "host" : "gitlab.nefelus.com"
    , "port" : 3306
