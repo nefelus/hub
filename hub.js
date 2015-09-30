@@ -1005,13 +1005,13 @@ function startMaster(ticket, cb) {
 
   var dataTypes;
   if (nt.isSetSessionParam(ticket.req.sessionId, '4d')) { // Allow only documentation viewing.
-    dataTypes = ["IP_DOCS", "TOOL_DOCS"];
+    dataTypes = ['IP_DOCS', 'TOOL_DOCS'];
   } else {
-    dataTypes = ["SHARED_DATA", "USER_DATA", "IP_DATA_LIB"];
+    dataTypes = ['SHARED_DATA', 'USER_DATA', 'IP_DATA_LIB'];
   }
   var Ids;
   dataTypes.forEach(function(dt) {
-    Ids = quotashares.permits.getPermittedResources({company:sid.companyId, user:sid.clientId, project:sid.projectId}, dt, (dt !== "USER_DATA"));
+    Ids = quotashares.permits.getPermittedResources({company:sid.companyId, user:sid.clientId, project:sid.projectId}, dt, (dt !== 'USER_DATA'));
     if (Ids) {
       allIds = allIds.concat(Ids[dt]);
     }
@@ -1042,7 +1042,7 @@ function startMaster(ticket, cb) {
     }
 
     dataTypes.forEach(function(dt) {
-      Ids = quotashares.permits.getPermittedResources({company:runasSid.companyId, user:runasSid.clientId, project:runasSid.projectId}, dt, (dt !== "USER_DATA"));
+      Ids = quotashares.permits.getPermittedResources({company:runasSid.companyId, user:runasSid.clientId, project:runasSid.projectId}, dt, (dt !== 'USER_DATA'));
       if (Ids) {
         allIds = allIds.concat(Ids[dt]);
       }
@@ -1087,7 +1087,7 @@ function startMaster(ticket, cb) {
     var iptables = secgroups.getRules(sid.companyId, sid.projectId);
     if (iptables.length > 0) {
       iptables.forEach(function(n, i) {
-        //"sec_group_id":1,"company_id":0,"project_id":0,"id":1,"direction":"I","interface":"eth0","protocol":"tcp","address":"*","ports":"22","condition":"*"
+        //'sec_group_id':1,'company_id':0,'project_id':0,'id':1,'direction':'I','interface':'eth0','protocol':'tcp','address':'*','ports':'22','condition':'*'
         n.condition=n.condition.trim();
         logger.log(ticket.req.sessionId+': Sec Group Rule= '+ n.direction + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports+ ' ' + n.condition);
         userData['sr' + i] = n.direction.toUpperCase() + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports + ' ' + ((n.condition !== '') ? n.condition : '*');
@@ -1107,7 +1107,7 @@ function startMaster(ticket, cb) {
 
   allShares.forEach(function(n, i) {
     if ((n.fstype !== '') && (n.location !== '') && (n.mountPoint !== '')) {
-      //"fstype":"nfs","location":"10.0.0.2:/tools/icscape","mountParams":null,"mountPoint":"/tools/icscape"}
+      //'fstype':'nfs','location':'10.0.0.2:/tools/icscape','mountParams':null,'mountPoint':'/tools/icscape'}
       logger.log(ticket.req.sessionId+': share = '+ n.location + ' ' + n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : ''));
       userData[n.fstype + i] = n.location + ' ' + n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : '');
     }
@@ -3087,7 +3087,7 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWE
                     function(callback) {
                       if ((lastUpdatedConfig['MACHINE']) && (lastUpdatedConfig['MACHINE']['reload'])) {
                         machines.loadMachines(mysqlClient, function(err, machineData) {
-                          err && logger.log("Machines", err);
+                          err && logger.log('Machines', err);
                           if (machineData) {
                             logger.log(machineData);
                             var nowDate = new Date();
@@ -3103,7 +3103,7 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWE
                     function(machineData, callback) {
                       if ((lastUpdatedConfig['QUEUE_QUOTA']) && (lastUpdatedConfig['QUEUE_QUOTA']['reload'])) {
                         quotas.loadQueueQuotas(mysqlClient, MAX_RUNNING_JOBS_ALLOWED, function(err, queueQuotaData) {
-                          err && logger.log("QueueQuotas", err);
+                          err && logger.log('QueueQuotas', err);
                           if (queueQuotaData) {
                             logger.log(queueQuotaData);
                             quotashares.loadQueueQuotas(mysqlClient, MAX_RUNNING_JOBS_ALLOWED, function(err, queueQuotaData) {});
@@ -3120,7 +3120,7 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWE
                     function(machineData, queueQuotaData, callback) {
                       if ((lastUpdatedConfig['IMAGES']) && (lastUpdatedConfig['IMAGES']['reload'])) {
                         images.loadImages(mysqlClient, function(err, imageData) {
-                          err && logger.log("Images", err);
+                          err && logger.log('Images', err);
                           if (imageData) {
                             logger.log(imageData);
                             var nowDate = new Date();
@@ -3136,7 +3136,7 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWE
                     function(machineData, queueQuotaData, imageData, callback) {
                       if ((lastUpdatedConfig['CLOUD']) && (lastUpdatedConfig['CLOUD']['reload'])) {
                         clouds.loadClouds(mysqlClient, function(err, cloudData) {
-                          err && logger.log("Clouds", err);
+                          err && logger.log('Clouds', err);
                           if (cloudData) {
                             logger.log(cloudData);
                             var nowDate = new Date();
@@ -3176,7 +3176,7 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWE
                       if (((lastUpdatedConfig['TOOL_APPS']) && (lastUpdatedConfig['TOOL_APPS']['reload'])) ||
                           ((lastUpdatedConfig['LICENSE_MANAGER']) && (lastUpdatedConfig['LICENSE_MANAGER']['reload']))) {
                         toolapps.loadToolApps(mysqlClient, function(err, toolappsData) {
-                          err && logger.log("ToolApps", err);
+                          err && logger.log('ToolApps', err);
                           if (toolappsData) {
                             logger.log(toolappsData);
                             var nowDate = new Date();
@@ -3194,7 +3194,7 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWE
                     function(machineData, queueQuotaData, imageData, cloudData, sharesData, toolappsData, callback) {
                       if ((lastUpdatedConfig['SEC_GROUP_RULES']) && (lastUpdatedConfig['SEC_GROUP_RULES']['reload'])) {
                         secgroups.loadSecGroups(mysqlClient, function(err, secgroupsData) {
-                          err && logger.log("SecGroups", err);
+                          err && logger.log('SecGroups', err);
                           if (secgroupsData) {
                             logger.log(secgroupsData);
                             var nowDate = new Date();
