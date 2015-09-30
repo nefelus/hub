@@ -170,6 +170,7 @@ var keyName;
 var securityGroup;
 var workerUsername;
 var setloginuser;
+var setsecgroups;
 
 var hubType;
 var hubPort;
@@ -417,6 +418,7 @@ function loadConfig() {
   keyName = mainconf.get('aws:ec2:keyName') || 'nefelus1-keypair';
   securityGroup = mainconf.get('aws:ec2:securityGroup') || 'default';
   setloginuser = mainconf.get('setloginuser') || false;
+  setsecgroups = mainconf.get('setsecgroups') || false;
   workerUsername = mainconf.get('nefelus:username');
   logURLproto = mainconf.get('nefelus:logURL:protocol');
   vncURLproto = mainconf.get('nefelus:vncURL:protocol');
@@ -1081,19 +1083,21 @@ function startMaster(ticket, cb) {
     userData['USERDEF'] = ticket.loginuser;
   }
 
-  var iptables = secgroups.getRules(sid.companyId, sid.projectId);
-  if (iptables.length > 0) {
-    iptables.forEach(function(n, i) {
-      //"sec_group_id":1,"company_id":0,"project_id":0,"id":1,"direction":"I","interface":"eth0","protocol":"tcp","address":"*","ports":"22","condition":"*"
-      n.condition=n.condition.trim();
-      logger.log(ticket.req.sessionId+': Sec Group Rule= '+ n.direction + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports+ ' ' + n.condition);
-      userData['sr' + i] = n.direction.toUpperCase() + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports + ' ' + ((n.condition!=='') ? n.condition : '*');
-    });
-  }
-  if (ticket.licenseManager !== '') {
-    var lmp = ticket.licenseManager.replace(/@.*/,'');
-    var lma = ticket.licenseManager.replace(/.*@/,'');
-    userData['srLM'] = 'E eth0 tcp ' + lma + ' ' + lmp + ' *';
+  if (setsecgroups) {
+    var iptables = secgroups.getRules(sid.companyId, sid.projectId);
+    if (iptables.length > 0) {
+      iptables.forEach(function(n, i) {
+        //"sec_group_id":1,"company_id":0,"project_id":0,"id":1,"direction":"I","interface":"eth0","protocol":"tcp","address":"*","ports":"22","condition":"*"
+        n.condition=n.condition.trim();
+        logger.log(ticket.req.sessionId+': Sec Group Rule= '+ n.direction + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports+ ' ' + n.condition);
+        userData['sr' + i] = n.direction.toUpperCase() + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports + ' ' + ((n.condition !== '') ? n.condition : '*');
+      });
+    }
+    if (ticket.licenseManager !== '') {
+      var lmp = ticket.licenseManager.replace(/@.*/,'');
+      var lma = ticket.licenseManager.replace(/.*@/,'');
+      userData['srLM'] = 'E eth0 tcp ' + lma + ' ' + lmp + ' *';
+    }
   }
 
   if (! vncLocalOnly) {
