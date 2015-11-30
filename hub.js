@@ -77,7 +77,7 @@ memwatch.on('leak', function(info) {
 // History.md serves as a ChangeLog.
 //------------------------------------------------------------------------
 
-var HUBversion = 'v1.2.0';
+var HUBversion = 'v1.2.1';
 
 var constants  = require('constants');
 var util       = require('util');
@@ -2651,15 +2651,19 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
             }
           }
           if (timezone) {
-            if (record.started) {
+            if ((record.started) && (record.started !== '')) {
               var dts = new Date(record.started);
               dts.setTimezone(timezone);
               record.started = dts.toString();
+            } else {
+              record.started = 'N/A'
             }
-            if (record.completed) {
+            if ((record.completed) && (record.completed !== '')) {
               var dtc = new Date(record.completed);
               dtc.setTimezone(timezone);
               record.completed = dtc.toString();
+            } else {
+              record.completed = 'N/A'
             }
           }
           cb(null, record);
