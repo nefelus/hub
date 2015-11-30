@@ -114,9 +114,19 @@ var machines = require('./lib/machines');
 
 envconf.env();
 
+var isJX = (path.basename(process.argv[0]) === 'jx');
+var myargs = ((path.basename(process.argv[0]) === 'node') ||
+              (path.basename(process.argv[0]) === 'jx')) ?
+             process.argv.slice(2) : process.argv.slice(1);
+
 logger.log('--------------------------------------------------');
 logger.log('-             Nefelus HUB ' + HUBversion + '                 -');
 logger.log('--------------------------------------------------');
+
+if ((myargs[0] === '-V') || (myargs[0] === '--version')) {
+  process.exit(0);
+}
+
 logger.log('CWD :' +  process.cwd());
 logger.log('--------------------------------------------------');
 
