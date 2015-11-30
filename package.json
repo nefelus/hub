@@ -1,7 +1,7 @@
 {
   "name": "nefelus-hub",
   "description": "Nefelus HUB",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "dependencies": {
     "socket.io": "0.9.17",
     "socket.io-client": "0.9.17",
