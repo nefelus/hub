@@ -2550,8 +2550,9 @@ function middleSessionOperation(type, id, sid, sqlpool, status,  msgParams) {
   if (isSessionActive !== null) {
     var activeTicket = Tickets[isSessionActive];
     var peer = activeTicket.getMaster('socket');
+    var masterTicket = dupTicket(activeTicket.get('id'));
     if (peer !== null) {
-      var msg = {'reqId' : id, 'sessionId' : sid};
+      var msg = {'reqId' : id, 'sessionId' : sid, 'ticket' : masterTicket};
       logger.log(sid + ': SENT ' + type + ' to '+peer)
       for (var attr in msgParams) {
         msg[attr] = msgParams[attr];
