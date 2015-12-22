@@ -169,6 +169,7 @@ var mainconf = new nconf.Provider();
 
 var sslOptions = false;
 var sslMasterPack = false;
+var masterScripts = false;
 var aws;
 var awsParams = {};
 var r53info;
@@ -426,6 +427,12 @@ function loadConfig() {
   EC2_TIMEOUT = mainconf.get('aws:ec2_timeout') || 10000;
   EC2_MAX_TRIES = mainconf.get('aws:ec2_max_tries') || 60;
 
+  masterScripts = mainconf.get('nefelus:masterScripts') || false;
+  if (masterScripts && (masterScripts !== '') && (nt.isReadableSync(masterScripts))) {
+    masterScripts = fs.readFileSync(masterScripts);
+  } else {
+    masterScripts = false;
+  }
   vncLocalOnly = nt.isTrue(mainconf.get('vncLocalOnly'));
   staticUserData = mainconf.get('staticUserData') || {};
   xtermSupport = mainconf.get('xterm') || 'NO';
@@ -1162,30 +1169,36 @@ function startMaster(ticket, cb) {
   var md5sum = crypto.createHash('md5');
   var enckey = md5sum.update(_enckey).digest('hex');
 
-  nt.cryptData(sslMasterPack, enckey, function(err, data) {
-    if (! err) {
-      userData['crt'] = data;
+  nt.cryptData(masterScripts, enckey, function(mserr, msdata) {
+    if (! mserr) {
+      userData['masterscripts'] = msdata;
     }
 
-    startMachines(ticket.req.ami, 1, ticket.req.machineId, ticket.req.sessionId, userData, function(err, data) {
-      if (err) {
-        logger.log('Failed to start instance for ' + ticket.req.sessionId);
-        cb(err, null);
-      } else {
-        if (data) {
-          getMachinesInfo(data, function(err, data) {
-            if (err) {
-              logger.log('Failed to get machine info for ' + ticket.req.sessionId);
-              cb(err, null);
-            } else {
-              ticket.machineStarted = new Date();
-              cb(null, data);
-            }
-          });
-        } else {
-          cb(null, null);
-        }
+    nt.cryptData(sslMasterPack, enckey, function(err, data) {
+      if (! err) {
+        userData['crt'] = data;
       }
+
+      startMachines(ticket.req.ami, 1, ticket.req.machineId, ticket.req.sessionId, userData, function(err, data) {
+        if (err) {
+          logger.log('Failed to start instance for ' + ticket.req.sessionId);
+          cb(err, null);
+        } else {
+          if (data) {
+            getMachinesInfo(data, function(err, data) {
+              if (err) {
+                logger.log('Failed to get machine info for ' + ticket.req.sessionId);
+                cb(err, null);
+              } else {
+                ticket.machineStarted = new Date();
+                cb(null, data);
+              }
+            });
+          } else {
+            cb(null, null);
+          }
+        }
+      });
     });
   });
 }
