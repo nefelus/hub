@@ -99,6 +99,7 @@ var UUID       = require('node-uuid');
 var exec       = require('child_process').exec;
 var tmp        = require('tmp');
 var time       = require('time')(Date);
+var timediff   = require('timediff');
 var async      = require('async');
 var envconf    = new nconf.Provider();
 var logger     = require('./lib/logging').logger;
@@ -212,6 +213,9 @@ var ep; // EC2 endpoint
 var EC2Params;
 var ec2;
 var r53;
+var cancelHours = 0;
+var forceCancelHours = 0;
+var cancelHoursTimer = null;
 
 loadConfig();
 
@@ -439,6 +443,20 @@ function loadConfig() {
   x11IdleTimeout = mainconf.get('nefelus:x11IdleTimeout');
   homeBlacklistPatterns = mainconf.get('nefelus:homeBlacklistPatterns') || [];
   sessionsPath = mainconf.get('hub:sessionsPath');
+  cancelHours = mainconf.get('hub:cancelHours') || 0;
+  forceCancelHours = mainconf.get('hub:forceCancelHours') || ((cancelHours === 0) ? 0 : cancelHours + 2);
+  if (cancelHours !== 0) {
+    if (cancelHoursTimer == null) {
+      cancelHoursTimer = setInterval(function() {
+                                                   TerminateLongRunningSessions();
+                                                }, 300000); // check every 5 minutes
+    }
+  } else {
+    if (cancelHoursTimer !== null) {
+      clearInterval(cancelHoursTimer);
+      cancelHoursTimer = null;
+    }
+  }
   ignoreOldSessions = mainconf.get('ignoreOldSessions');
   adminEmail = mainconf.get('adminEmail');
   masterDebug = mainconf.get('nefelus:masterDebug') || false;
@@ -486,6 +504,9 @@ function Ticket(id) {
   this.cancelPending = false;
   this.sessionStatus = '';
   this.jobStatus = '';
+  this.created = new Date();
+  this.machineStarted = null;
+  this.jobStarted = null;
   this.internalError = '';
   this.healthCheckTimer = null;
   this.consoleCheckTimer = null;
@@ -623,11 +644,14 @@ function Ticket(id) {
     }
     if (this.req.sessionId != '') {
       Sessions[this.req.sessionId] = null;
+      delete Sessions[this.req.sessionId];
     }
     if (this.master.instanceId != '') {
       Instances[this.master.instanceId] = null;
+      delete Instances[this.master.instanceId];
     }
     Tickets['t' + this.id] = null;
+    delete Tickets['t' + this.id];
   }
 
   Tickets['t' + id] = this;
@@ -719,6 +743,7 @@ function updateStatus(sqlpool, id, mystatus, keys, values, cb) {
     case 'ENDED':
     case 'CANCELED':
     case 'TERMINATED':
+    case 'FORCEDOUT':
     case 'WARNING':
       q = 'STATUS = ?, COMPLETED = ?, UPDATED = ? ';
       params = [mystatus, now , now];
@@ -733,6 +758,9 @@ function updateStatus(sqlpool, id, mystatus, keys, values, cb) {
   if (typeof Tickets['t' + id] !== 'undefined') {
     if (Tickets['t' + id] != null) {
       Tickets['t' + id].jobStatus = mystatus;
+      if ((mystatus === 'RUNNING') || (mystatus === 'SETUP')) {
+        Tickets['t' + id].jobStarted = new Date();
+      }
     }
   }
 
@@ -1150,6 +1178,7 @@ function startMaster(ticket, cb) {
               logger.log('Failed to get machine info for ' + ticket.req.sessionId);
               cb(err, null);
             } else {
+              ticket.machineStarted = new Date();
               cb(null, data);
             }
           });
@@ -1158,7 +1187,6 @@ function startMaster(ticket, cb) {
         }
       }
     });
-
   });
 }
 
@@ -2138,6 +2166,7 @@ io.sockets.on('connection', function (socket) {
                             logger.log(sessionId + ': Waiting console to become ready ' + cct);
                             Tickets[myticket].set('consoleCheckTimes', cct - 1);
                             if ((!err) || (cct === 0)) {
+                              Tickets[myticket].set('consoleCheckTimes', CONSOLE_CHECK_MAX_TIMES);
                               clearInterval(Tickets[myticket].consoleCheckTimer)
                               Tickets[myticket].consoleCheckTimer = null;
                               updateStatus(mysqlPool, reqID, 'RUNNING', mysqlKeys, mysqlValues);
@@ -2554,8 +2583,10 @@ function middleSessionOperation(type, id, sid, sqlpool, status,  msgParams) {
     if (peer !== null) {
       var msg = {'reqId' : id, 'sessionId' : sid, 'ticket' : masterTicket};
       logger.log(sid + ': SENT ' + type + ' to '+peer)
-      for (var attr in msgParams) {
-        msg[attr] = msgParams[attr];
+      if (msgParams) {
+        for (var attr in msgParams) {
+          msg[attr] = msgParams[attr];
+        }
       }
       io.sockets.socket(peer).emit(type, JSON.stringify(msg), parseAck);
       updateStatus(sqlpool, id, status);
@@ -3312,4 +3343,33 @@ function checkForPendingUserTerminate(recs, sessionId) {
     }
   }
   return null;
+}
+
+function TerminateLongRunningSessions() {
+  logger.log('Checking for long running jobs...');
+  for (var key in Tickets) {
+    var ticket = Tickets[key];
+    if (ticket !== null) {
+
+      //middleSessionOperation('cancel', ticket.id, ticket.sessionId, mysqlPool, 'TERMNINATED', {});
+      var checktime = null;
+      if (ticket.machineStarted) {
+        checktime = ticket.machineStarted;
+      }
+      if (ticket.jobStarted) {
+        checktime = ticket.jobStarted;
+      }
+      var td = timediff(checktime, 'now', 'Hm');
+      if (cancelHours !== 0) {
+        if ((((td.hours * 60) + td.minutes) > (cancelHours * 60)) && (((td.hours * 60) + td.minutes) < (forceCancelHours * 60))) {
+          logger.log(ticket.req.sessionId+': WARNING: Session excided running time limit. Sending cancel message to terminate.')
+          middleSessionOperation('cancel', ticket.id, ticket.req.sessionId, mysqlPool, 'FORCEDOUT', {});
+        } else if (((td.hours * 60) + td.minutes) > (forceCancelHours * 60)) {
+          logger.log(ticket.req.sessionId+': WARNING: Session was forced to cancel but it is still running. Forcing Termination');
+          TerminateSession(ticket.req.sessionId);
+          updateStatus(mysqlPool, ticket.id, 'FORCEDOUT', [], [], function(err, data) {}); // Don't send emails in such cases.
+        }
+      }
+    }
+  }
 }
