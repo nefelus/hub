@@ -163,7 +163,7 @@ if (! nt.isReadableSync(configFilename)) {
 
 var HEALTH_CHECK_INTERVAL = 30000; // 30 secs
 var CONSOLE_CHECK_INTERVAL = 5000; // 5 secs
-var CONSOLE_CHECK_MAX_TIMES = 36;  // 36 times * 5 secs = 3 minutes
+var CONSOLE_CHECK_MAX_TIMES = 60;  // 60 times * 5 secs = 5 minutes
 var env = process.env;
 var mainconf = new nconf.Provider();
 
@@ -2163,7 +2163,9 @@ io.sockets.on('connection', function (socket) {
                               mysqlValues.push(':1'); // Ooops hardcoded!
                             }
 
-                            logger.log(sessionId + ': Waiting console to become ready ' + cct);
+                            if ((cct % 5 ) == 0 ) {
+                              logger.log(sessionId + ': Waiting console to become ready ' + cct);
+                            }
                             Tickets[myticket].set('consoleCheckTimes', cct - 1);
                             if ((!err) || (cct === 0)) {
                               Tickets[myticket].set('consoleCheckTimes', CONSOLE_CHECK_MAX_TIMES);
