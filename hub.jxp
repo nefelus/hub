@@ -41,6 +41,7 @@
                     "jx install request@~2.42.0",
                     "jx install lodash@~2.4.1",
                     "jx install time",
+                    "jx install timediff@^1.1.1",
                     "jx install tmp"
 	],
 	"library": true,
