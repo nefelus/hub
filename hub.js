@@ -3174,7 +3174,7 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWE
                           err && logger.log('QueueQuotas', err);
                           if (queueQuotaData) {
                             logger.log(queueQuotaData);
-                            quotashares.loadQueueQuotas(mysqlClient, MAX_RUNNING_JOBS_ALLOWED, function(err, queueQuotaData) {});
+                            quotashares.loadQuotaShares(mysqlClient, function(err, queueQuotaData) {});
                             var nowDate = new Date();
                             lastUpdatedConfig['QUEUE_QUOTA']['timestamp'] = Number(nowDate.valueOf());
                             lastUpdatedConfig['QUEUE_QUOTA']['reload'] = false;
