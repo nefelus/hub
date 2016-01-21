@@ -546,6 +546,7 @@ function Ticket(id) {
     machineId : 0,
     machineSpeed : '',
     machineCount : 1,
+    threadCount : null,
     instanceType : null,
     ami : null,
     commandFile : '',
@@ -1784,7 +1785,8 @@ var dispatcher = function dispatcher () {
                               var hubreqid = records[i].ID;
                               var machineId = records[i].MACHINE_ID || 0;
                               var machineSpeed = machines.getSpeed(machineId);
-                              var machineCount = records[i].CPU_COUNT || '1';
+                              var threadCount = records[i].CPU_COUNT || null;
+                              var machineCount = '1'; //FIXME
                               machineCount = parseInt(machineCount, 10);
                               if (isNaN(machineCount)) {
                                 machineCount = 1;
@@ -1801,6 +1803,7 @@ var dispatcher = function dispatcher () {
                               t.setRequest('sessionId', sessionId);
                               t.setRequest('runas', runas);
                               t.setRequest('machineId', machineId);
+                              t.setRequest('threadCount', threadCount);
                               t.setRequest('machineCount', machineCount);
                               t.setRequest('machineSpeed', machineSpeed); // FIXME : not really necessary
                               t.setRequest('commandFile', commandFile);
@@ -2813,6 +2816,7 @@ function handleDownloadFinished(socket, sessionId, ticket, msg) {
     var commandFile = Tickets[ticket].getRequest('commandFile') || '';
     var runningDir = Tickets[ticket].getRequest('runningDir') || '';
     var machineCount = Tickets[ticket].getRequest('machineCount') || '1';
+    var threadCount = Tickets[ticket].getRequest('threadCount') || null;
     Tickets[ticket].set('sessionStatus', 'execute');
     masterTicket = dupTicket(reqID);
     var licenseManager = Tickets[ticket].getRequest('licenseManager') || '';
@@ -2823,6 +2827,7 @@ function handleDownloadFinished(socket, sessionId, ticket, msg) {
       'commandFile' : commandFile,
       'licenseManager' : licenseManager,
       'machineCount' : machineCount,
+      'threadCount' : threadCount,
       'x11IdleTimeout' : x11IdleTimeout,
       'ticket' : masterTicket
     };
@@ -2904,6 +2909,7 @@ function handleToolDownloadFinished(socket, sessionId, ticket, msg) {
     var commandFile = Tickets[ticket].getRequest('commandFile') || '';
     var runningDir = Tickets[ticket].getRequest('runningDir') || '';
     var machineCount = Tickets[ticket].getRequest('machineCount') || '1';
+    var threadCount = Tickets[ticket].getRequest('threadCount') || null;
     Tickets[ticket].set('sessionStatus', 'execute');
     masterTicket = dupTicket(reqID);
     mesg = {
@@ -2912,6 +2918,7 @@ function handleToolDownloadFinished(socket, sessionId, ticket, msg) {
       'runningDir' : runningDir,
       'commandFile' : commandFile,
       'machineCount' : machineCount,
+      'threadCount' : threadCount,
       'x11IdleTimeout' : x11IdleTimeout,
       'ticket' : masterTicket
     };
