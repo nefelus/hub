@@ -15,6 +15,7 @@
    , "forceCancelHours" : 0
    , "skipCycles" : 8
   }, 
+  "noVNCdebug" : false,
   "adminEmail" : "kosmasgiannis@gmail.com",
   "timezone" : "Asia/Tokyo",
   "setloginuser" : false,

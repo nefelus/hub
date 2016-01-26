@@ -183,6 +183,7 @@ var securityGroup;
 var workerUsername;
 var setloginuser;
 var setsecgroups;
+var noVNCdebug;
 
 var hubType;
 var hubPort;
@@ -440,6 +441,7 @@ function loadConfig() {
   securityGroup = mainconf.get('aws:ec2:securityGroup') || 'default';
   setloginuser = mainconf.get('setloginuser') || false;
   setsecgroups = mainconf.get('setsecgroups') || false;
+  noVNCdebug = mainconf.get('noVNCdebug') || false;
   workerUsername = mainconf.get('nefelus:username');
   logURLproto = mainconf.get('nefelus:logURL:protocol');
   vncURLproto = mainconf.get('nefelus:vncURL:protocol');
@@ -2150,6 +2152,7 @@ io.sockets.on('connection', function (socket) {
 
         if (jobType == 'interactive') {
           var vncURLargs = '?password=' + Tickets[myticket].get('uuid') + '&title=Nefelus%20-%20' + (sessionId.split('_')[4] || 'VNC.Console');
+          vncURLargs += (noVNCdebug === true) ? '&logging=debug' : '';
           vncURL = (vncURL != '') ?  vncURLproto + '://' + vncURL + ':' + vncURLport + vncURLargs : '';
         } else if (jobType == 'prompt') {
           vncURL = (vncURL != '') ?  cmdURLproto + '://' + vncURL + ':' + cmdURLport + '?key=' + Tickets[myticket].get('uuid') : '';
