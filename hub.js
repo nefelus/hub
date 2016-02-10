@@ -437,7 +437,7 @@ function loadConfig() {
   vncLocalOnly = nt.isTrue(mainconf.get('vncLocalOnly'));
   staticUserData = mainconf.get('staticUserData') || {};
   xtermSupport = mainconf.get('xterm') || 'NO';
-  keyName = mainconf.get('aws:ec2:keyName') || 'nefelus1-keypair';
+  keyName = mainconf.get('aws:ec2:keyName') || null;
   securityGroup = mainconf.get('aws:ec2:securityGroup') || 'default';
   setloginuser = mainconf.get('setloginuser') || false;
   setsecgroups = mainconf.get('setsecgroups') || false;
@@ -1235,10 +1235,13 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
     MinCount       : count,
     MaxCount       : count,
     UserData       : ud,
-    KeyName        : keyName,
     SecurityGroups : [securityGroup],
     InstanceType   : speed
   };
+
+  if (keyName !== null) {
+    args['KeyName'] = keyName;
+  }
 
   if (blockDeviceMappings.length) {
     args['BlockDeviceMappings'] = blockDeviceMappings;
