@@ -1157,7 +1157,7 @@ function startMaster(ticket, cb) {
     if ((n.fstype !== '') && (n.location !== '') && (n.mountPoint !== '')) {
       //'fstype':'nfs','location':'10.0.0.2:/tools/icscape','mountParams':null,'mountPoint':'/tools/icscape'}
       logger.log(ticket.req.sessionId+': share = '+ n.location + ' ' + n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : ''));
-      userData[n.fstype + i] = n.location + ' ' + n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : '');
+      userData[n.fstype + i] = n.location + ' ' + n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : ' ro');
     }
   });
 
