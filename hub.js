@@ -77,7 +77,7 @@ memwatch.on('leak', function(info) {
 // History.md serves as a ChangeLog.
 //------------------------------------------------------------------------
 
-var HUBversion = 'v1.4.0';
+var HUBversion = 'v1.4.1';
 
 var constants  = require('constants');
 var util       = require('util');
