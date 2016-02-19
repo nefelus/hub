@@ -210,7 +210,7 @@ var timerID = null;
 var masterDebug = false;
 var adminEmail;
 var MySQLParamsLoaded = false;
-var lastUpdatedSettings = {'config' : null, 'frequency' : 8, 'count' : 0};
+var lastUpdatedSettings = {'config' : null, 'frequency' : 6, 'count' : 0};
 var ep; // EC2 endpoint
 var EC2Params;
 var ec2;
