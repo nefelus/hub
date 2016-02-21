@@ -30,19 +30,19 @@
 	"assets": [
 	],
 	"preInstall": [
-                    "jx install nconf",
+                    "jx install async@~1.5.2",
+                    "jx install aws-sdk@~2.2.34",
+                    "jx install lodash@~2.4.1",
+                    "jx install mkdirp@~0.5.1",
+                    "jx install mysql@2.5.4",
+                    "jx install nconf@~0.8.4",
+                    "jx install node-uuid@~1.4.7",
+                    "jx install request@~2.42.0",
                     "jx install socket.io@0.9.17",
                     "jx install socket.io-client@0.9.17",
-                    "jx install async",
-                    "jx install aws-sdk",
-                    "jx install mkdirp",
-                    "jx install node-uuid",
-                    "jx install mysql@2.5.4",
-                    "jx install request@~2.42.0",
-                    "jx install lodash@~2.4.1",
-                    "jx install time",
+                    "jx install time@0.11.4",
                     "jx install timediff@^1.1.1",
-                    "jx install tmp"
+                    "jx install tmp@~0.0.28"
 	],
 	"library": true,
 	"fs_reach_sources": true

@@ -3,22 +3,22 @@
   "description": "Nefelus HUB",
   "version": "1.4.1",
   "dependencies": {
-    "async": "",
-    "aws-sdk": "",
-    "camelize": "0.1.2",
-    "cli-table": "",
-    "commander": "",
+    "async": "~1.5.2",
+    "aws-sdk": "~2.2.34",
+    "camelize": "1.0.0",
+    "cli-table": "~0.3.1",
+    "commander": "~2.9.0",
     "express": "4.x.x",
     "lodash": "~2.4.1",
-    "mkdirp": "",
-    "mysql": "2.5.4",
-    "nconf": "",
-    "node-uuid": "",
+    "mkdirp": "~0.5.1",
+    "mysql": "~2.x.x",
+    "nconf": "~0.8.4",
+    "node-uuid": "~1.4.7",
     "request": "~2.42.0",
     "socket.io": "0.9.17",
     "socket.io-client": "0.9.17",
-    "time": "",
+    "time": "0.11.4",
     "timediff": "^1.1.1",
-    "tmp": ""
+    "tmp": "~0.0.28"
   }
 }

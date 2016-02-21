@@ -18,12 +18,10 @@
 	"assets": [
 	],
         "preInstall": [
-                    "jx install nconf",
-                    "jx install aws-sdk",
-                    "jx install commander",
-                    "jx install cli-table",
-                    "jx install socket.io-client@0.9.16",
-                    "jx install lodash"
+                    "jx install nconf@~0.8.4",
+                    "jx install commander@~2.9.0",
+                    "jx install socket.io-client@0.9.17",
+                    "jx install lodash@~2.4.1"
         ],
 	"native": false,
 	"library": true,

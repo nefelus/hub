@@ -1,14 +1,10 @@
 var program = require('commander');
 var path = require('path');
 var nconf = require('nconf');
-var AWS = require('aws-sdk');
-var Table = require('cli-table');
 var io = require('socket.io-client');
 var _ = require('lodash');
 var env = process.env;
 var nt = require(path.join(__dirname, './lib/tools'));
-var ec2;
-var ep = null;
 var myname;
 var socket = null;
 var hubServer = null;
