@@ -30,6 +30,11 @@
    , "acquireTimeout"  : 30000
    , "queryinterval" : 15000
   },
+  "nslm" : {
+     "baseURL" : "http://127.0.0.1:9911/"
+   , "accessKey" : "4C78CEABA2E745A1B5E0A6128A5C9F62"
+   , "secretKey" : "A05487F6CDEE305816126CBFDF145A0F8EC4F6FFDE5E1D8F5734F76184393B3A"
+  },
   "vncLocalOnly" : true,
   "xterm" : "NO",
   "staticUserData" : {
