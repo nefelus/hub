@@ -4,7 +4,7 @@
 //
 // Author    : Giannis Kosmas <kosmasgiannis@gmail.com>
 // Date      : 2012-12-26
-// Copyright : Nefelus INC,  2012-2014
+// Copyright : Nefelus INC,  2012-2016
 //------------------------------------------------------------------------
 
 /*
