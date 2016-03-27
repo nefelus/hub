@@ -473,7 +473,7 @@ function loadConfig() {
                          feature : NEFELUS_HUB_FEATURE
                        });
       nslm.start();
-      nslm.on('change', function(active) {
+      nslm.on('change', function(active)
         logger.log('nslm active =', active);
         nslmSessionIsActive = active;
       });
