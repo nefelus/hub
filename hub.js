@@ -460,13 +460,9 @@ function loadConfig() {
                          feature : NEFELUS_HUB_FEATURE
                        });
       nslm.start();
-      nslm.on('active', function() {
-        console.log('nslm is active');
-        nslmSessionIsActive = true;
-      });
-      nslm.on('inactive', function() {
-        console.log('nslm is inactive');
-        nslmSessionIsActive = false;
+      nslm.on('change', function(active)
+        logger.log('nslm active =', active);
+        nslmSessionIsActive = active;
       });
     } else {
       nslm.end(function(err, data) { // checkin old session and then start a new one.
