@@ -341,7 +341,20 @@ function loadConfig() {
       sslCert = fs.readFileSync(ssl.cert);
     }
     if ((ssl.ca !== '') && (nt.isReadableSync(ssl.ca))) {
-      sslCa = fs.readFileSync(ssl.ca);
+      //sslCa = fs.readFileSync(ssl.ca);
+      sslCa = []
+      var chain = fs.readFileSync(ssl.ca, 'utf8');
+      var chain = chain.split("\n");
+      var cert = []
+      for (var l=0; l<chain.length; l++) {
+        if (chain[l].length > 0) {
+          cert.push(chain[l]);
+          if (chain[l].match(/-END CERTIFICATE-/)) {
+            sslCa.push(cert.join("\n"));
+            cert = [];
+          }
+        }
+      }
     }
     if ((ssl.masterPack) && (ssl.masterPack !== '') &&
         (nt.isReadableSync(ssl.masterPack))) {
