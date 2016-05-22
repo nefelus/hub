@@ -771,6 +771,12 @@ function updateStatus(sqlpool, id, mystatus, keys, values, cb) {
       if ((mystatus === 'RUNNING') || (mystatus === 'SETUP')) {
         Tickets['t' + id].jobStarted = new Date();
       }
+      if (keys !== undefined) {
+        var tempTicket = dupTicket(id) {
+        var internalState = JSON.stringify(tempTicket);
+        keys.push('INTERNAL_STATE');
+        values.push(internalState);
+      }
     }
   }
 
