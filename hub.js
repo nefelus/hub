@@ -772,7 +772,7 @@ function updateStatus(sqlpool, id, mystatus, keys, values, cb) {
         Tickets['t' + id].jobStarted = new Date();
       }
       if (keys !== undefined) {
-        var tempTicket = dupTicket(id) {
+        var tempTicket = dupTicket(id);
         var internalState = JSON.stringify(tempTicket);
         keys.push('INTERNAL_STATE');
         values.push(internalState);
@@ -1511,6 +1511,44 @@ function dupTicket(id) {
     t.master.socket = null; // Do not use setMaster here!!!
   }
   return t;
+}
+
+function recoverTicketFromInternalState(mysqlPool, key, id, cb) {
+  if (mysqlPool !== null) {
+    mysqlPool.getConnection(function(err, mysqlClient) {
+      if (err) {
+        logger.log(err);
+        cb(err, null);
+        return;
+      }
+
+      mysqlClient.query(SQL.getInternalState + ' WHERE ' + key + ' = ?;', [id], function(err, rows, fields) {
+
+        if (err) {
+          logger.log('Error from MYSQL query:');
+          logger.log(err);
+          mysqlClient.release();
+          cb(err, null);
+          return;
+        }
+
+        var intState = null;
+        if (rows.length) {
+          intState = rows[0].INTERNAL_STATE || null;
+          if (intState !== null) {
+            try {
+              intState = JSON.parse(intState);
+            } catch(e) {
+              intState = null;
+            }
+          }
+        }
+        mysqlClient.release();
+        cb(null, intState);
+        return;
+      });
+    });
+  }
 }
 
 var parseAck = function(ack) {
@@ -3145,14 +3183,21 @@ function handleHello(socket, instanceId, ticket, msg) {
     socket.set('hostname', servername, function () {});
     socket.emit('welcome', JSON.stringify(mesg), parseAck);
   } else {
-    // FIXME: recover ticket from somewhere!
-    logger.log('ERROR: Could not find corresponding session for Instance ' + instanceId);
-    if (reqID !== null) {
-      mysqlKeys = ['NOTE'];
-      mysqlValues = ['ERROR: Could not find corresponding session for Instance ' + instanceId];
-      updateStatus(mysqlPool, reqID, 'ERROR', mysqlKeys, mysqlValues);
-      //FIXME: no sessionId so no mail to user?
-    }
+    recoverTicketFromInternalState(mysqlPool, 'INSTANCE_ID', instanceId, function (err, data) {
+      if (data === null) {
+        logger.log('ERROR: Could not find corresponding session for Instance ' + instanceId);
+        if (reqID !== null) {
+          mysqlKeys = ['NOTE'];
+          mysqlValues = ['ERROR: Could not find corresponding session for Instance ' + instanceId];
+          updateStatus(mysqlPool, reqID, 'ERROR', mysqlKeys, mysqlValues);
+          //FIXME: no sessionId so no mail to user?
+        }
+      } else {
+        recoverTicket(data, socket);
+        var myticket = getTicketIdByInstanceId(instanceId);
+        handleHello(socket, instanceId, myticket, msg);
+      }
+    });
   }
 }
 
