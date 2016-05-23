@@ -772,7 +772,7 @@ function updateStatus(sqlpool, id, mystatus, keys, values, cb) {
         Tickets['t' + id].jobStarted = new Date();
       }
       if (keys !== undefined) {
-        var tempTicket = dupTicket(id) {
+        var tempTicket = dupTicket(id);
         var internalState = JSON.stringify(tempTicket);
         keys.push('INTERNAL_STATE');
         values.push(internalState);
