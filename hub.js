@@ -1642,7 +1642,7 @@ var dispatcher = function dispatcher () {
           } else {
             logger.log('checkForUpdatedConfigs: '+err);
           }
-          if (MySQLParamsLoaded == false) {
+          if (MySQLParamsLoaded === false) {
             logger.log('(re)loading params');
             loadMySQLParams(mysqlClient, lastUpdatedSettings.config, MAX_RUNNING_JOBS_ALLOWED, function(err, data) {
               if (! err) {
