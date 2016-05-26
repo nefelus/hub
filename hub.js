@@ -1044,7 +1044,6 @@ function startMaster(ticket, cb) {
 
   var allShares = [];
   var allIds = [];
-  var runasToolShares = null;
   var toolXtermSupport = toolapps.getXtermSupport(sid.toolId);
   var toolMountPoint = toolapps.getMountPoint(sid.toolId);
   var toolAdditionalMountPoints = toolapps.getAdditionalMountPoints(sid.toolId);
@@ -1578,7 +1577,7 @@ var lmDispatcher = function lmDispatcher() {
     return;
   }
   lmDispatcherIsRunning = true;
-  var now = nt.getDateTimeNow(true, false);
+  //var now = nt.getDateTimeNow(true, false);
   var query = 'SELECT * FROM atable';
   if (mysqlPool !== null) {
     mysqlPool.getConnection(function(err, mysqlClient) {
@@ -2182,7 +2181,7 @@ io.sockets.on('connection', function (socket) {
   socket.on('set_viewers', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      var APIversion = msg.APIversion || '1.0';
+      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var reqID = null;
       var myticket = getTicketIdBySessionId(sessionId);
@@ -2276,12 +2275,10 @@ io.sockets.on('connection', function (socket) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
       var sessionId = msg.sessionId || '';
-      var APIversion = msg.APIversion || '1.0';
+      //var APIversion = msg.APIversion || '1.0';
       var status = msg.status || '';
-      var message = msg.message || '';
       logger.log(sessionId + ': Got DOWNLOAD_FINISHED with status : ' + status);
 
-      var reqID = null;
       var myticket = getTicketIdBySessionId(sessionId);
       var masterTicket = msg.ticket || null;
       if (myticket == null) {
@@ -2301,13 +2298,11 @@ io.sockets.on('connection', function (socket) {
   socket.on('tool_download_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      var APIversion = msg.APIversion || '1.0';
+      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
-      var message = msg.message || '';
       logger.log(sessionId + ': Got TOOL_DOWNLOAD_FINISHED with status : ' + status);
 
-      var reqID = null;
       var myticket = getTicketIdBySessionId(sessionId);
       var masterTicket = msg.ticket || null;
       if (myticket == null) {
@@ -2327,13 +2322,11 @@ io.sockets.on('connection', function (socket) {
   socket.on('data_download_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      var APIversion = msg.APIversion || '1.0';
+      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
-      var message = msg.message || '';
       logger.log(sessionId + ': Got DATA_DOWNLOAD_FINISHED with status : ' + status);
 
-      var reqID = null;
       var myticket = getTicketIdBySessionId(sessionId);
       var masterTicket = msg.ticket || null;
       if (myticket == null) {
@@ -2353,14 +2346,12 @@ io.sockets.on('connection', function (socket) {
   socket.on('execute_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      var APIversion = msg.APIversion || '1.0';
+      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
-      var message = msg.message || '';
       var cancelled = msg.cancelled || '';
       logger.log(sessionId + ': Got EXECUTE_FINISHED ' + ((cancelled) ? '[terminated] ' : '') + 'with status : ' + status);
 
-      var reqID = null;
       var myticket = getTicketIdBySessionId(sessionId);
       var masterTicket = msg.ticket || null;
       if (myticket == null) {
@@ -2380,13 +2371,11 @@ io.sockets.on('connection', function (socket) {
   socket.on('upload_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      var APIversion = msg.APIversion || '1.0';
+      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
-      var message = msg.message || '';
       logger.log(sessionId + ': Got UPLOAD_FINISHED with status : ' + status);
 
-      var reqID = null;
       var myticket = getTicketIdBySessionId(sessionId);
       var masterTicket = msg.ticket || null;
       if (myticket == null) {
@@ -2406,7 +2395,7 @@ io.sockets.on('connection', function (socket) {
   socket.on('data_pull_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      var APIversion = msg.APIversion || '1.0';
+      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
       var message = msg.message || '';
@@ -2447,7 +2436,7 @@ io.sockets.on('connection', function (socket) {
   socket.on('data_push_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      var APIversion = msg.APIversion || '1.0';
+      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
       var message = msg.message || '';
@@ -2493,7 +2482,7 @@ io.sockets.on('connection', function (socket) {
   socket.on('cleanup_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      var APIversion = msg.APIversion || '1.0';
+      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
       logger.log(sessionId + ': Got CLEANUP_FINISHED with status : ' + status);
@@ -2519,14 +2508,12 @@ io.sockets.on('connection', function (socket) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
 
-      var APIversion = msg.APIversion || '1.0';
+      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
-      var message = msg.message || '';
       var masterTicket = msg.ticket || null;
       logger.log(sessionId + ': Got READY with status : ' + status);
 
-      var reqID = null;
       var myticket = getTicketIdBySessionId(sessionId);
       if (myticket == null) {
         recoverTicket(masterTicket, socket);
@@ -2547,11 +2534,8 @@ io.sockets.on('connection', function (socket) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
 
-      var APIversion = msg.APIversion || '1.0';
-      var sessionId = null;
-      var reqID = null;
+      //var APIversion = msg.APIversion || '1.0';
       var instanceId = msg.instanceId || '';
-      var reqSessionId = msg.reqSessionId || '';
       logger.log('Got HELLO from master: ' + instanceId);
       var myticket = getTicketIdByInstanceId(instanceId);
 
