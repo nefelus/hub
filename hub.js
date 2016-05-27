@@ -1735,12 +1735,12 @@ var dispatcher = function dispatcher () {
                     if (realSession) {
                       var realTicket = Tickets[realSession];
                       if (realTicket.jobStatus == 'SETUP') {
-                        realTicket.set('sessionStatus', 'finished');
-                        updateStatus(mysqlPool, records[i].ID, 'ENDED', [], [], function(err, data) {}); // Don't send emails in such cases.
                         if (realTicket.getMaster('instanceId') != '') {
+                          realTicket.set('sessionStatus', 'finished');
                           logger.log(records[i].SESSION_ID + ': Canceling instance '+realTicket.getMaster('instanceId'));
                           TerminateSession(records[i].SESSION_ID);
                           updateStatus(mysqlPool, realTicket.id, 'CANCELED', [], [], function(err, data) {}); // Don't send emails in such cases.
+                          updateStatus(mysqlPool, records[i].ID, 'ENDED', [], [], function(err, data) {}); // Don't send emails in such cases.
                         } else {
                           logger.log(records[i].SESSION_ID + ': Scheduled for cancel.');
                           realTicket.cancelPending = true;
@@ -1948,22 +1948,12 @@ var dispatcher = function dispatcher () {
                                         mysqlValues.push(t.get('uuid'));
                                         updateStatus(mysqlPool, hubreqid, 'SETUP', mysqlKeys, mysqlValues);
                                         logger.log(sessionId + ': Master ' + data[0].instanceId + ' started successfully');
-                                        if (t.get('cancelPending')) {
-                                          logger.log(sessionId + ': Was scheduled for cancel.');
-                                          TerminateSession(sessionId);
-                                          updateStatus(mysqlPool, hubreqid, 'CANCELED', [], [], function(err, data) {}); // Don't send emails in such cases.
-                                        }
                                       } else {
                                         if (data === null) {
                                           // if startMaster returns null data put back in queue
                                           // FIXME : skip for some cycles...
-                                          if (t.get('cancelPending')) {
-                                            logger.log(sessionId + ': Was scheduled for cancel.');
-                                            updateStatus(mysqlPool, hubreqid, 'CANCELED', [], [], function(err, data) {}); // Don't send emails in such cases.
-                                          } else {
-                                            skippedSessions[sessionId] = SKIP_CYCLES;
-                                            updateStatus(mysqlPool, hubreqid, 'PENDING', ['QUEUE_INFO'], ['{"message":"Cloud resources exhausted"}']);
-                                          }
+                                          skippedSessions[sessionId] = SKIP_CYCLES;
+                                          updateStatus(mysqlPool, hubreqid, 'PENDING', ['QUEUE_INFO'], ['{"message":"Cloud resources exhausted"}']);
                                           logger.warn(sessionId + ': failed to start master due to limitted cloud resources, will retry on next check');
                                         } else {
                                           logger.log(sessionId + ': ERROR SETTING UP JOB, startMachines returned empty value');
@@ -3165,7 +3155,9 @@ function handleHello(socket, instanceId, ticket, msg) {
     socket.set('instance', instanceId, function () {});
     socket.set('session', sessionId, function () {});
     socket.set('hostname', servername, function () {});
-    socket.emit('welcome', JSON.stringify(mesg), parseAck);
+    if (Tickets[ticket].get('cancelPending') === false) {
+      socket.emit('welcome', JSON.stringify(mesg), parseAck);
+    }
   } else {
     recoverTicketFromInternalState(mysqlPool, 'INSTANCE_ID', instanceId, function (err, data) {
       if (data === null) {
