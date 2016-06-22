@@ -786,7 +786,14 @@ function updateStatus(sqlpool, id, mystatus, keys, values, cb) {
       }
       if (keys !== undefined) {
         var tempTicket = dupTicket(id);
-        var internalState = JSON.stringify(tempTicket);
+        var internalState = '';
+        try {
+          internalState = JSON.stringify(tempTicket);
+        } catch (ej) {
+          logger.log('Error on JSON.stringify');
+          logger.log(ej);
+          logger.log(util.inspect(tempTicket, {depth:null}));
+        };
         keys.push('INTERNAL_STATE');
         values.push(internalState);
       }
