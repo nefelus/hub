@@ -2138,7 +2138,8 @@ io.sockets.on('connection', function (socket) {
           myticket = getTicketIdBySessionId(sessionId);
         }
         if (myticket !== null) {
-          if (Tickets[myticket].getMaster('socket') == null) {
+          var mysocket = Tickets[myticket].getMaster('socket');
+          if ((mysocket == null) || (mysocket !== socket.id)) {
             Tickets[myticket].setMaster('socket', socket.id);
           }
           if (masterTicket !== null) {
