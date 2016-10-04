@@ -8,6 +8,12 @@ OTHER_FILES = package.json
 CONFIGS = config.json
 JX_FILES = hub.jxp nef.jxp nef-com.jxp nef-hub.jxp
 
+lint:
+	for f in $(SRC_FILES); do \
+		echo "--- $$f ---"; \
+		uglifyjs -o /dev/null --lint $$f 2>&1 ;\
+	done
+
 pack: distclean
 	mkdir -p dist/hub/lib
 	#npm shrinkwrap
