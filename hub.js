@@ -1064,6 +1064,7 @@ function startMaster(ticket, cb) {
 
   var allShares = [];
   var allIds = [];
+  var adminIds = [];
   var toolXtermSupport = toolapps.getXtermSupport(sid.toolId);
   var toolMountPoint = toolapps.getMountPoint(sid.toolId);
   var toolAdditionalMountPoints = toolapps.getAdditionalMountPoints(sid.toolId);
@@ -1083,23 +1084,10 @@ function startMaster(ticket, cb) {
     dataTypes = ['SHARED_DATA', 'USER_DATA', 'IP_DATA_LIB'];
   }
   var Ids;
+  var permittedResourcesFilters = [];
   dataTypes.forEach(function(dt) {
-    Ids = quotashares.permits.getPermittedResources({company:sid.companyId, user:sid.clientId, project:sid.projectId}, dt, (dt !== 'USER_DATA'));
-    if (Ids) {
-      allIds = allIds.concat(Ids[dt]);
-    }
+    permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype: dt, inherit:(dt !== 'USER_DATA')});
   });
-
-  var adminIds = [];
-  // Get shares in order to allow company admin to have write access to companies SHARED_DATA mounts.
-  if (ticket.useradmin == 'C') {
-    adminIds = quotashares.permits.getPermittedResources({company:sid.companyId, user:sid.clientId, project:sid.projectId}, 'SHARED_DATA', true );
-    if (adminIds) {
-      adminIds=adminIds['SHARED_DATA'];
-    } else {
-      adminIds=[];
-    }
-  }
 
   var runasSid = nt.parseSessionId(ticket.req.runas);
   if (runasSid !== '') {
@@ -1115,163 +1103,182 @@ function startMaster(ticket, cb) {
     }
 
     dataTypes.forEach(function(dt) {
-      Ids = quotashares.permits.getPermittedResources({company:runasSid.companyId, user:runasSid.clientId, project:runasSid.projectId}, dt, (dt !== 'USER_DATA'));
-      if (Ids) {
-        allIds = allIds.concat(Ids[dt]);
-      }
+      permittedResourcesFilters.push({company:runasSid.companyId, user:runasSid.clientId, project:runasSid.projectId, rtype: dt, inherit:(dt !== 'USER_DATA')});
     });
-
   }
-
-  var projectShares = shares.getByIds(allIds); // FIXME : if multiple clouds are introduced, add cloudId.
-
-  projectShares.forEach(function(n, i) {
-    var notfound = true;
-    var j;
-    var mntp=n;
-
-    if (ticket.useradmin == 'C') { // Allow company admin to have write access to companies SHARED_DATA mounts.
-      if (adminIds.indexOf(''+n.id) !== -1) {
-        mntp.mountParams = ro2rw(mntp.mountParams);
+  quotashares.getPermittedResources(mysqlPool, permittedResourcesFilters, function(err, data) {
+    if (err) {
+      logger.log("ERROR: There was an error while fetching quotashares. Machine might launch without all external disks");
+    }
+    if (data) {
+      for (var prkey in data) {
+        allIds = allIds.concat(data[prkey]);
       }
     }
-
-    for (j=0; j<allShares.length; j++) {
-      if ((mntp.fstype == allShares[j].fstype) && (mntp.location == allShares[j].location) &&
-          (mntp.mountPoint == allShares[j].mountPoint) && (mntp.mountParams == allShares[j].mountParams)) {
-        notfound = false;
+    permittedResourcesFilters = [];
+    if (ticket.useradmin == 'C') {
+      permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype:'SHARED_DATA', inherit: true});
+    }
+    // Get shares in order to allow company admin to have write access to companies SHARED_DATA mounts.
+    quotashares.getPermittedResources(mysqlPool, permittedResourcesFilters, function (err, admindata) {
+      if (err) {
+        logger.log("ERROR: There was an error while fetching quotashares. Machine might launch without all external disks");
       }
-    }
-    if (notfound) {
-      allShares.push(mntp);
-    }
-  });
-
-  allShares = _.uniq(allShares, false, 'uuid');
-
-  userData['reqSessionId'] = ticket.req.sessionId;
-  userData['machineType'] = hubType;
-  userData['hubServer'] = hubProtocol + '://' + hubHost + ':' + hubPort;
-  if ((setloginuser) && (ticket.loginuser !== 'nefelus')) {
-    userData['USERDEF'] = ticket.loginuser;
-  }
-
-  if (setsecgroups) {
-    var iptables = secgroups.getRules(sid.companyId, sid.projectId);
-    if (iptables.length > 0) {
-      iptables.forEach(function(n, i) {
-        //'sec_group_id':1,'company_id':0,'project_id':0,'id':1,'direction':'I','interface':'eth0','protocol':'tcp','address':'*','ports':'22','condition':'*'
-        n.condition=n.condition.trim();
-        logger.log(ticket.req.sessionId+': Sec Group Rule= '+ n.direction + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports+ ' ' + n.condition);
-        userData['sr' + i] = n.direction.toUpperCase() + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports + ' ' + ((n.condition !== '') ? n.condition : '*');
-      });
-    }
-    if (ticket.licenseManager !== '') {
-      var lmp = ticket.licenseManager.replace(/@.*/,'');
-      var lma = ticket.licenseManager.replace(/.*@/,'');
-      userData['srLM'] = 'E eth0 tcp ' + lma + ' ' + lmp + ' *';
-    }
-  }
-
-  if (! vncLocalOnly) {
-    userData['vncLocalOnly'] = 'NO';
-  }
-  userData['xterm'] = toolXtermSupport;
-
-  allShares.forEach(function(n, i) {
-    if ((n.fstype !== '') && (n.location !== '') && (n.mountPoint !== '')) {
-      //'fstype':'nfs','location':'10.0.0.2:/tools/icscape','mountParams':null,'mountPoint':'/tools/icscape'
-      logger.log(ticket.req.sessionId+': share = '+ n.location + ' ' + n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : ''));
-      userData[n.fstype + i] = n.location + ' '+ n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : ' ro');
-      userData['h' + n.fstype + i] = n.location;
-      userData['c' + n.fstype + i] = n.mountPoint;
-      userData['p' + n.fstype + i] = (((n.mountParams!==null) && (n.mountParams!=='')) ? (n.mountParams) : 'ro');
-    }
-  });
-
-  // encrypt and send SSL certificates
-  // FIXME : Run this in hub init.d : cat /var/log/messages > /dev/urandom; ifconfig > /dev/urandom
-  if (ticket.req.ami === null) {
-    logger.log(ticket.req.sessionId+': ERROR, AMI not defined');
-    cb('ERROR, AMI not set.', null);
-    return;
-  }
-  var _enckey = ticket.req.ami + ticket.req.machineSpeed + ticket.req.sessionId + '\n';
-  var md5sum = crypto.createHash('md5');
-  var enckey = md5sum.update(_enckey).digest('hex');
-
-  nt.cryptData(masterScripts, enckey, function(mserr, msdata) {
-    if (! mserr) {
-      userData['masterscripts'] = msdata;
-    }
-
-    nt.cryptData(sslMasterPack, enckey, function(err, data) {
-      if (! err) {
-        userData['crt'] = data;
+      if (admindata) {
+        adminIds = admindata['SHARED_DATA'] || [];
       }
 
-      startMachines(ticket.req.ami, 1, ticket.req.machineId, ticket.req.sessionId, userData, function(err, data) {
-        if (err) {
-          logger.log('Failed to start instance for ' + ticket.req.sessionId);
-          cb(err, null);
-        } else {
-/*
-          if (data) {
-            getMachinesInfo(data, function(err, data) {
-              if (err) {
-                logger.log('Failed to get machine info for ' + ticket.req.sessionId);
-                cb(err, null);
-              } else {
-                ticket.machineStarted = new Date();
-                cb(null, data);
-              }
-            });
-          } else {
-            cb(null, null);
-          }
-*/
-          if (data) {
+      var projectShares = shares.getByIds(allIds); // FIXME : if multiple clouds are introduced, add cloudId.
 
-            async.each(data, function(item, callback) {
+      projectShares.forEach(function(n, i) {
+        var notfound = true;
+        var j;
+        var mntp=n;
 
-              associateNextFreeAddress(item, hasAutoAssignFloatingIp, function(err, resp) {
-                if (err === null) {
-                  logger.log(ticket.req.sessionId + ': IP '+resp.address+' associated to '+resp.instance);
-                  callback();
-                } else {
-                  logger.log(ticket.req.sessionId + ': Error while associating IP address to : '+resp.instance+' : '+util.inspect(err, {depth:null}));
-                  callback(err);
-                }
-              });
-
-            },
-            function (err) {
-              if (err) {
-                // One of the associations produced an error. Kill machines and let system retry later.
-                KillMachines(data, function (err, killedMachines) {
-                  if (err) {
-                    logger.log(ticket.req.sessionId + ': Failed to terminate instance ' + killedMachines.join());
-                  } else {
-                    logger.log(ticket.req.sessionId + ': Machines ' + killedMachines.join() + ' terminated');
-                  }
-                  cb(null, null); // This will cause to retry session later due to limited resources
-                });
-              } else {
-                getMachinesInfo(data, function(err, machineinfo) {
-                  if (err) {
-                    logger.log('Failed to get machine info for ' + ticket.req.sessionId);
-                    cb(err, null); // FIXME: check err, data value
-                  } else {
-                    ticket.machineStarted = new Date();
-                    cb(null, machineinfo);
-                  }
-                });
-              }
-            });
-          } else {
-            cb(null, null);
+        if (ticket.useradmin == 'C') { // Allow company admin to have write access to companies SHARED_DATA mounts.
+          if (adminIds.indexOf(''+n.id) !== -1) {
+            mntp.mountParams = ro2rw(mntp.mountParams);
           }
         }
+
+        for (j=0; j<allShares.length; j++) {
+          if ((mntp.fstype == allShares[j].fstype) && (mntp.location == allShares[j].location) &&
+              (mntp.mountPoint == allShares[j].mountPoint) && (mntp.mountParams == allShares[j].mountParams)) {
+            notfound = false;
+          }
+        }
+        if (notfound) {
+          allShares.push(mntp);
+        }
+      });
+
+      allShares = _.uniq(allShares, false, 'uuid');
+
+      userData['reqSessionId'] = ticket.req.sessionId;
+      userData['machineType'] = hubType;
+      userData['hubServer'] = hubProtocol + '://' + hubHost + ':' + hubPort;
+      if ((setloginuser) && (ticket.loginuser !== 'nefelus')) {
+        userData['USERDEF'] = ticket.loginuser;
+      }
+
+      if (setsecgroups) {
+        var iptables = secgroups.getRules(sid.companyId, sid.projectId);
+        if (iptables.length > 0) {
+          iptables.forEach(function(n, i) {
+            //'sec_group_id':1,'company_id':0,'project_id':0,'id':1,'direction':'I','interface':'eth0','protocol':'tcp','address':'*','ports':'22','condition':'*'
+            n.condition=n.condition.trim();
+            logger.log(ticket.req.sessionId+': Sec Group Rule= '+ n.direction + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports+ ' ' + n.condition);
+            userData['sr' + i] = n.direction.toUpperCase() + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports + ' ' + ((n.condition !== '') ? n.condition : '*');
+          });
+        }
+        if (ticket.licenseManager !== '') {
+          var lmp = ticket.licenseManager.replace(/@.*/,'');
+          var lma = ticket.licenseManager.replace(/.*@/,'');
+          userData['srLM'] = 'E eth0 tcp ' + lma + ' ' + lmp + ' *';
+        }
+      }
+
+      if (! vncLocalOnly) {
+        userData['vncLocalOnly'] = 'NO';
+      }
+      userData['xterm'] = toolXtermSupport;
+
+      allShares.forEach(function(n, i) {
+        if ((n.fstype !== '') && (n.location !== '') && (n.mountPoint !== '')) {
+          //'fstype':'nfs','location':'10.0.0.2:/tools/icscape','mountParams':null,'mountPoint':'/tools/icscape'
+          logger.log(ticket.req.sessionId+': share = '+ n.location + ' ' + n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : ''));
+          userData[n.fstype + i] = n.location + ' '+ n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : ' ro');
+          userData['h' + n.fstype + i] = n.location;
+          userData['c' + n.fstype + i] = n.mountPoint;
+          userData['p' + n.fstype + i] = (((n.mountParams!==null) && (n.mountParams!=='')) ? (n.mountParams) : 'ro');
+        }
+      });
+
+      // encrypt and send SSL certificates
+      // FIXME : Run this in hub init.d : cat /var/log/messages > /dev/urandom; ifconfig > /dev/urandom
+      if (ticket.req.ami === null) {
+        logger.log(ticket.req.sessionId+': ERROR, AMI not defined');
+        cb('ERROR, AMI not set.', null);
+        return;
+      }
+      var _enckey = ticket.req.ami + ticket.req.machineSpeed + ticket.req.sessionId + '\n';
+      var md5sum = crypto.createHash('md5');
+      var enckey = md5sum.update(_enckey).digest('hex');
+
+      nt.cryptData(masterScripts, enckey, function(mserr, msdata) {
+        if (! mserr) {
+          userData['masterscripts'] = msdata;
+        }
+
+        nt.cryptData(sslMasterPack, enckey, function(err, data) {
+          if (! err) {
+            userData['crt'] = data;
+          }
+
+          startMachines(ticket.req.ami, 1, ticket.req.machineId, ticket.req.sessionId, userData, function(err, data) {
+            if (err) {
+              logger.log('Failed to start instance for ' + ticket.req.sessionId);
+              cb(err, null);
+            } else {
+/*
+              if (data) {
+                getMachinesInfo(data, function(err, data) {
+                  if (err) {
+                    logger.log('Failed to get machine info for ' + ticket.req.sessionId);
+                    cb(err, null);
+                  } else {
+                    ticket.machineStarted = new Date();
+                    cb(null, data);
+                  }
+                });
+              } else {
+                cb(null, null);
+              }
+*/
+              if (data) {
+
+                async.each(data, function(item, callback) {
+
+                  associateNextFreeAddress(item, hasAutoAssignFloatingIp, function(err, resp) {
+                    if (err === null) {
+                      logger.log(ticket.req.sessionId + ': IP '+resp.address+' associated to '+resp.instance);
+                      callback();
+                    } else {
+                      logger.log(ticket.req.sessionId + ': Error while associating IP address to : '+resp.instance+' : '+util.inspect(err, {depth:null}));
+                      callback(err);
+                    }
+                  });
+
+                },
+                function (err) {
+                  if (err) {
+                    // One of the associations produced an error. Kill machines and let system retry later.
+                    KillMachines(data, function (err, killedMachines) {
+                      if (err) {
+                        logger.log(ticket.req.sessionId + ': Failed to terminate instance ' + killedMachines.join());
+                      } else {
+                        logger.log(ticket.req.sessionId + ': Machines ' + killedMachines.join() + ' terminated');
+                      }
+                      cb(null, null); // This will cause to retry session later due to limited resources
+                    });
+                  } else {
+                    getMachinesInfo(data, function(err, machineinfo) {
+                      if (err) {
+                        logger.log('Failed to get machine info for ' + ticket.req.sessionId);
+                        cb(err, null); // FIXME: check err, data value
+                      } else {
+                        ticket.machineStarted = new Date();
+                        cb(null, machineinfo);
+                      }
+                    });
+                  }
+                });
+              } else {
+                cb(null, null);
+              }
+            }
+          });
+        });
       });
     });
   });
@@ -3372,7 +3379,6 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWE
                           err && logger.log('QueueQuotas', err);
                           if (queueQuotaData) {
                             logger.log(queueQuotaData);
-                            quotashares.loadQuotaShares(mysqlClient, function(err, queueQuotaData) {});
                             var nowDate = new Date();
                             lastUpdatedConfig['QUEUE_QUOTA']['timestamp'] = Number(nowDate.valueOf());
                             lastUpdatedConfig['QUEUE_QUOTA']['reload'] = false;
