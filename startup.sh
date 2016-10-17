@@ -11,7 +11,7 @@ if [ -e hub.jx ]; then
 elif [ -e hub.js ]; then
   exe=hub.js
   launcher=node
-elif [[ -e hub.sh && -e hub ]]; then
+if [[ -e hub.sh && -e hub ]]; then
   launcher=/bin/bash
   exe=hub.sh
 fi
