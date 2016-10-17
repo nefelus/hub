@@ -8,9 +8,12 @@ cd $sourceDir
 if [ -e hub.jx ]; then
   exe=hub.jx
   launcher=/usr/local/bin/jx
-else
+elif [ -e hub.js ]; then
   exe=hub.js
   launcher=node
+if [[ -e hub.sh && -e hub ]]; then
+  launcher=/bin/bash
+  exe=hub.sh
 fi
 
 usage ()
