@@ -23,10 +23,10 @@ memwatch.on('leak', function(info) {
 });
 */
 
-var HUBversion = 'v1.5.2';
-
 var NEFELUS_HUB_FEATURE = 'af04a46364987c32b0664750ea50d7df'; // Nefelus HUB 1.0
 
+var thepackage = require('./package.json');
+var HUBversion = 'v'+thepackage.version;
 var constants  = require('constants');
 var util       = require('util');
 var path       = require('path');
