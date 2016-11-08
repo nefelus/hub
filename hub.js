@@ -52,7 +52,6 @@ var async      = require('async');
 var envconf    = new nconf.Provider();
 var logger     = require('./lib/logging').logger;
 var images = require('./lib/images');
-var machines = require('./lib/machines');
 var secgroups = require('./lib/secgroups');
 var quotas = require('./lib/quotas');
 var quotashares = require('./lib/quotashares');
@@ -121,6 +120,7 @@ var sslMasterPack = false;
 var masterScripts = false;
 var aws;
 var awsParams = {};
+var awsAccountId;
 var r53info;
 var dnsPostprocess;
 
@@ -153,6 +153,7 @@ var x11IdleTimeout;
 var homeBlacklistPatterns = [];
 var sessionsPath;
 var ignoreOldSessions;
+var emailTemplates;
 var MAX_RUNNING_JOBS_ALLOWED;
 var db;
 var timerID = null;
@@ -180,7 +181,9 @@ if (fs.existsSync(sessionsPath + '/hubSession.json')) {
   if (stats.size == 0) {
     try {
       fs.unlinkSync(sessionsPath + '/hubSession.json');
-    } catch (e) {}
+    } catch (e) {
+      // empty line
+    }
   }
 }
 hubSession.file({file: sessionsPath + '/hubSession.json'});
@@ -301,15 +304,15 @@ function loadConfig() {
     }
     if ((ssl.ca !== '') && (nt.isReadableSync(ssl.ca))) {
       //sslCa = fs.readFileSync(ssl.ca);
-      sslCa = []
+      sslCa = [];
       var chain = fs.readFileSync(ssl.ca, 'utf8');
-      var chain = chain.split("\n");
-      var cert = []
+      chain = chain.split('\n');
+      var cert = [];
       for (var l=0; l<chain.length; l++) {
         if (chain[l].length > 0) {
           cert.push(chain[l]);
           if (chain[l].match(/-END CERTIFICATE-/)) {
-            sslCa.push(cert.join("\n"));
+            sslCa.push(cert.join('\n'));
             cert = [];
           }
         }
@@ -359,7 +362,7 @@ function loadConfig() {
     'accessKeyId' : mainconf.get('aws:ec2:accessKeyId'),
     'secretAccessKey' : mainconf.get('aws:ec2:secretAccessKey'),
     'region' : mainconf.get('aws:ec2:region') || 'us-east-1'
-  }
+  };
   awsAccountId = mainconf.get('aws:ec2:accountId');
   dnsPostprocess = mainconf.get('aws:dnsPostprocess') || 'route53';
   r53info = mainconf.get('aws:route53') || null;
@@ -488,6 +491,7 @@ function loadConfig() {
   }
 }
 
+/*
 function SaveSession(exit) {
   logger.log('Saving session');
   hubSession.set('Instances', Instances);
@@ -503,6 +507,7 @@ function SaveSession(exit) {
     }
   });
 }
+*/
 
 function Ticket(id) {
 
@@ -569,6 +574,7 @@ function Ticket(id) {
   // --- Methods ---
 
   this.setRequest = function (name, value) {
+    var sid;
     if (_.isArray(name)) {
       for (var key in name) {
         if ((key === 'length') || (!name.hasOwnProperty(key))) {
@@ -583,7 +589,7 @@ function Ticket(id) {
         }
         if ((key === 'sessionId') || (key === 'machineId')) {
           if ((this.req.sessionId !== '') && (this.req.machineId !== 0)) {
-            var sid = nt.parseSessionId(this.req.sessionId);
+            sid = nt.parseSessionId(this.req.sessionId);
             this.req.instanceType = machines.getAMItype(this.req.machineId);
             if (this.req.instanceType) {
               this.req.ami = images.getAMI(this.req.instanceType, sid.toolId, 0); // FIXME : cloud 0 and delete line bellow
@@ -601,7 +607,7 @@ function Ticket(id) {
       }
       if ((name === 'sessionId') || (name === 'machineId')) {
         if ((this.req.sessionId !== '') && (this.req.machineId !== 0)) {
-          var sid = nt.parseSessionId(this.req.sessionId);
+          sid = nt.parseSessionId(this.req.sessionId);
           this.req.instanceType = machines.getAMItype(this.req.machineId);
           if (this.req.instanceType) {
             this.req.ami = images.getAMI(this.req.instanceType, sid.toolId, 0); // FIXME : cloud 0 and delete line bellow
@@ -609,38 +615,38 @@ function Ticket(id) {
         }
       }
     }
-  }
+  };
 
   this.get = function (name) {
     return this[name];
-  }
+  };
 
   this.set = function (name, value) {
     if (typeof this[name] !== 'undefined') {
       this[name] = value;
     }
-  }
+  };
 
   this.getRequest = function (name) {
     if (typeof this.req[name] !== 'undefined') {
       return this.req[name];
     }
     return null;
-  }
+  };
 
   this.setMaster = function (name, value) {
     this.master[name] = value;
     if (name === 'instanceId') {
       Instances[value] = 't' + this.id;
     }
-  }
+  };
 
   this.getMaster = function (name) {
     if (typeof this.master[name] !== 'undefined') {
       return this.master[name];
     }
     return null;
-  }
+  };
 
   this.deAssociate = function() {
     this.ticketStatus = 'CLOSED';
@@ -662,7 +668,7 @@ function Ticket(id) {
     }
     Tickets['t' + this.id] = null;
     delete Tickets['t' + this.id];
-  }
+  };
 
   Tickets['t' + id] = this;
 }
@@ -780,7 +786,7 @@ function updateStatus(sqlpool, id, mystatus, keys, values, cb) {
           logger.log('Error on JSON.stringify');
           logger.log(ej);
           logger.log(util.inspect(tempTicket, {depth:null}));
-        };
+        }
         keys.push('INTERNAL_STATE');
         values.push(internalState);
       }
@@ -933,6 +939,8 @@ function restartMaster(instanceId, sessionId) {
         logger.log(sessionId + ': ' + ticket.getMaster('aliasDnsName') + ' deregistered');
       }
       startMaster(ticket, function (err, data) {
+        var mysqlKeys;
+        var mysqlValues;
         if (err) {
           if (ticket.get('restartLimit') > 0) {
             logger.warn(sessionId + ': failed to restart master, will retry on next health check');
@@ -941,8 +949,8 @@ function restartMaster(instanceId, sessionId) {
             }, HEALTH_CHECK_INTERVAL);
           } else {
             logger.warn(sessionId + ': failed to restart master and restart limit exceeded.');
-            var mysqlKeys = ['NOTE'];
-            var mysqlValues = ['Error starting master, restart limit exceeded.'];
+            mysqlKeys = ['NOTE'];
+            mysqlValues = ['Error starting master, restart limit exceeded.'];
             var hubreqid = ticket.id;
             ticket.deAssociate();
             ticket = null;
@@ -1013,8 +1021,8 @@ function restartMaster(instanceId, sessionId) {
               logger.log(sessionId + ': ERROR SETTING UP JOB');
               ticket.deAssociate();
               ticket = null;
-              var mysqlKeys = ['NOTE'];
-              var mysqlValues = ['Error setting up job'];
+              mysqlKeys = ['NOTE'];
+              mysqlValues = ['Error setting up job'];
               updateStatus(mysqlPool, hubreqid, 'ERROR', mysqlKeys, mysqlValues, function(err, data) {
                 if (!err) {
                   sendSessionStatusEmail(sessionId, hubreqid, mysqlPool);
@@ -1224,7 +1232,7 @@ function startMaster(ticket, cb) {
 function startMachines(image, count, machineId, sessionId, userData, cb) {
   var k;
   var ud = '';
-  for (var k in userData) {
+  for (k in userData) {
     ud = ud + '#%' + k + ':' + userData[k] + '\n';
   }
   var udb = new Buffer(ud);
@@ -1305,7 +1313,7 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
                 if (err) {
                   setTimeout(function() {callback({sessionId: sessionId, err: err, id : id});}, 60000);
                 } else {
-                  callback(null, '')
+                  callback(null, '');
                 }
               });
             }
@@ -1344,14 +1352,18 @@ function KillMachines(machines, cb) {
       if (err) {
         setTimeout(function() {callback({machines : machines, err : err}, null);}, 3000);
       } else {
-        callback(null, '')
+        callback(null, '');
       }
     });
   }
 
   async.retry(600, _TerminateMachines, function(err, result) {
     if (err) {
-      try {err.machines = err.machines.join(); } catch (e) {}
+      try {
+        err.machines = err.machines.join();
+      } catch (e) {
+        // empty line
+      }
       logger.log('Warning: Could not terminate machine(s):' + err.machines);
       logger.log(util.inspect(err));
     }
@@ -1570,7 +1582,7 @@ var parseAck = function(ack) {
   } else {
     logger.log('Got bogus ack message:' + ack);
   }
-}
+};
 
 //  ---------------------------------------------------------------------------------------------------------
 //  MAIN PROGRAM
@@ -1778,15 +1790,10 @@ var dispatcher = function dispatcher () {
                 })();
                 break;
 
-              case 'exec_prompt':
-                if (jobType === 'batch') {
-                  jobType = 'prompt';
-                }
-              case 'exec_interactive':
-                if (jobType === 'batch') {
-                  jobType = 'interactive';
-                }
               case 'exec_batch':
+              case 'exec_interactive':
+              case 'exec_prompt':
+                jobType = records[i].COMMAND.toLowerCase().replace(/^exec_/, '');
                 if (mystate === 'on') {
                   var isCancelPending = checkForPendingUserTerminate(records, records[i].SESSION_ID);
                   if (isCancelPending !== null) {
@@ -1887,10 +1894,12 @@ var dispatcher = function dispatcher () {
                                   quotas.stats.add(companyId || 0, userId || 0, projectId || 0, toolId || 0, machineId);
 
                                   startMaster(t, function(err, data) {
+                                    var mysqlKeys;
+                                    var mysqlValues;
                                     if (err) {
                                       logger.log(sessionId + ': ERROR STARTING MASTER');
-                                      var mysqlKeys = ['NOTE'];
-                                      var mysqlValues = ['Error starting master'];
+                                      mysqlKeys = ['NOTE'];
+                                      mysqlValues = ['Error starting master'];
                                       t.deAssociate();
                                       t = null;
                                       updateStatus(mysqlPool, hubreqid, 'ERROR', mysqlKeys, mysqlValues, function(err, data) {
@@ -1949,8 +1958,8 @@ var dispatcher = function dispatcher () {
                                           ]);
                                         }, HEALTH_CHECK_INTERVAL);
                                         var now = nt.getDateTimeNow(true, false);
-                                        var mysqlKeys = ['LAUNCHED', 'INSTANCE_ID']; // INSTANCE_ID was MACHINE_NAME
-                                        var mysqlValues = [now, data[0].instanceId];
+                                        mysqlKeys = ['LAUNCHED', 'INSTANCE_ID']; // INSTANCE_ID was MACHINE_NAME
+                                        mysqlValues = [now, data[0].instanceId];
                                         mysqlKeys.push('UUID');
                                         mysqlValues.push(t.get('uuid'));
                                         updateStatus(mysqlPool, hubreqid, 'SETUP', mysqlKeys, mysqlValues);
@@ -1964,8 +1973,8 @@ var dispatcher = function dispatcher () {
                                           logger.warn(sessionId + ': failed to start master due to limitted cloud resources, will retry on next check');
                                         } else {
                                           logger.log(sessionId + ': ERROR SETTING UP JOB, startMachines returned empty value');
-                                          var mysqlKeys = ['NOTE'];
-                                          var mysqlValues = ['Error setting up job'];
+                                          mysqlKeys = ['NOTE'];
+                                          mysqlValues = ['Error setting up job'];
                                           t.deAssociate();
                                           t = null;
                                           updateStatus(mysqlPool, hubreqid, 'ERROR', mysqlKeys, mysqlValues, function(err, data) {
@@ -1991,7 +2000,7 @@ var dispatcher = function dispatcher () {
                                 }
                               })();
                             } else {
-                              activeTicket = Tickets[isSessionActive];
+                              var activeTicket = Tickets[isSessionActive];
                               logger.warn(records[i].SESSION_ID + ': Trying to start an active session! This should not have happened.');
                               logger.warn(records[i].SESSION_ID + ': Trying to recover last valid status.');
                               if (activeTicket.jobStatus !== '') {
@@ -2163,7 +2172,7 @@ io.sockets.on('connection', function (socket) {
         }
       } else {
         if (lastMsg.code === 'hello') {
-          instanceId = lastMsgData.instanceId;
+          var instanceId = lastMsgData.instanceId;
           myticket = getTicketIdByInstanceId(instanceId);
           handleHello(socket, instanceId, myticket, lastMsgData);
         } else {
@@ -2235,7 +2244,7 @@ io.sockets.on('connection', function (socket) {
                             Tickets[myticket].set('consoleCheckTimes', cct - 1);
                             if ((!err) || (cct === 0)) {
                               Tickets[myticket].set('consoleCheckTimes', CONSOLE_CHECK_MAX_TIMES);
-                              clearInterval(Tickets[myticket].consoleCheckTimer)
+                              clearInterval(Tickets[myticket].consoleCheckTimer);
                               Tickets[myticket].consoleCheckTimer = null;
                               updateStatus(mysqlPool, reqID, 'RUNNING', mysqlKeys, mysqlValues);
                               logger.log(sessionId + ': LOG URL: ' + Tickets[myticket].logConsole);
@@ -2635,7 +2644,7 @@ function middleSessionOperation(type, id, sid, sqlpool, status,  msgParams) {
     var masterTicket = dupTicket(activeTicket.get('id'));
     if (peer !== null) {
       var msg = {'reqId' : id, 'sessionId' : sid, 'ticket' : masterTicket};
-      logger.log(sid + ': SENT ' + type + ' to '+peer)
+      logger.log(sid + ': SENT ' + type + ' to '+peer);
       if (msgParams) {
         for (var attr in msgParams) {
           msg[attr] = msgParams[attr];
@@ -2675,7 +2684,7 @@ function sendSessionStatusEmail(sessionId, reqID, sqlpool) {
   var templateIndex = -1;
   var templateName = 'session-status';
 
-  for (var i = emailTemplates.length - 1; i >= 0; i--) {
+  for (i = emailTemplates.length - 1; i >= 0; i--) {
     if (emailTemplates[i].name == templateName) {
       templateIndex = i;
       break;
@@ -2751,14 +2760,14 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
               dts.setTimezone(timezone);
               record.started = dts.toString();
             } else {
-              record.started = 'N/A'
+              record.started = 'N/A';
             }
             if ((record.completed) && (record.completed !== '')) {
               var dtc = new Date(record.completed);
               dtc.setTimezone(timezone);
               record.completed = dtc.toString();
             } else {
-              record.completed = 'N/A'
+              record.completed = 'N/A';
             }
           }
           cb(null, record);
@@ -3270,12 +3279,12 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWE
                           if (sharesData) {
                             logger.log(sharesData);
                             var nowDate = new Date();
-                            lastUpdatedConfig['VOLUMES'] && ((lastUpdatedConfig['VOLUMES']['timestamp'] = Number(nowDate.valueOf())))
-                            lastUpdatedConfig['VOLUMES'] && (!(lastUpdatedConfig['VOLUMES']['reload'] = false))
-                            lastUpdatedConfig['MOUNT_POINTS'] && ((lastUpdatedConfig['MOUNT_POINTS']['timestamp'] = Number(nowDate.valueOf())))
-                            lastUpdatedConfig['MOUNT_POINTS'] && (!(lastUpdatedConfig['MOUNT_POINTS']['reload'] = false))
-                            lastUpdatedConfig['FILE_MANAGER'] && ((lastUpdatedConfig['FILE_MANAGER']['timestamp'] = Number(nowDate.valueOf())))
-                            lastUpdatedConfig['FILE_MANAGER'] && (!(lastUpdatedConfig['FILE_MANAGER']['reload'] = false))
+                            lastUpdatedConfig['VOLUMES'] && ((lastUpdatedConfig['VOLUMES']['timestamp'] = Number(nowDate.valueOf())));
+                            lastUpdatedConfig['VOLUMES'] && (!(lastUpdatedConfig['VOLUMES']['reload'] = false));
+                            lastUpdatedConfig['MOUNT_POINTS'] && ((lastUpdatedConfig['MOUNT_POINTS']['timestamp'] = Number(nowDate.valueOf())));
+                            lastUpdatedConfig['MOUNT_POINTS'] && (!(lastUpdatedConfig['MOUNT_POINTS']['reload'] = false));
+                            lastUpdatedConfig['FILE_MANAGER'] && ((lastUpdatedConfig['FILE_MANAGER']['timestamp'] = Number(nowDate.valueOf())));
+                            lastUpdatedConfig['FILE_MANAGER'] && (!(lastUpdatedConfig['FILE_MANAGER']['reload'] = false));
                           }
                           callback(err, machineData, queueQuotaData, imageData, cloudData, sharesData);
                         });
@@ -3328,8 +3337,8 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWE
                                                              '3' : imageData || null,
                                                              '4' : cloudData || null,
                                                              '5' : sharesData || null,
-                                                             '5' : toolappsData || null,
-                                                             '6' : secgroupsData || null
+                                                             '6' : toolappsData || null,
+                                                             '7' : secgroupsData || null
                                                             }); }, DBTIMEOUT);
                     } else {
                       logger.log('Loading from MySQL completed');
@@ -3363,7 +3372,7 @@ function checkForUpdatedConfigs(mysqlClient, lastupdatedConfigs, cb) {
   try {
     mysqlClient.query(SQL.lastupdated, function(err, rows, fields) {
       if (err) {
-        console.log('Error from MYSQL query:');
+        logger.log('Error from MYSQL query:');
         cb(err, null);
         return;
       } else {
@@ -3405,7 +3414,7 @@ function checkForUpdatedConfigs(mysqlClient, lastupdatedConfigs, cb) {
 function checkForPendingUserTerminate(recs, sessionId) {
   for (var i = 0; i < recs.length; i++) {
     if ((recs[i].COMMAND === 'USER_TERMINATE') && (recs[i].SESSION_ID === sessionId) && (recs[i].STATUS === 'PENDING')) {
-      return { index : i, id : recs[i].ID}
+      return { index : i, id : recs[i].ID};
     }
   }
   return null;
@@ -3428,7 +3437,7 @@ function TerminateLongRunningSessions() {
       var td = timediff(checktime, 'now', 'Hm');
       if (cancelHours !== 0) {
         if ((((td.hours * 60) + td.minutes) > (cancelHours * 60)) && (((td.hours * 60) + td.minutes) < (forceCancelHours * 60))) {
-          logger.log(ticket.req.sessionId+': WARNING: Session excided running time limit. Sending cancel message to terminate.')
+          logger.log(ticket.req.sessionId+': WARNING: Session excided running time limit. Sending cancel message to terminate.');
           middleSessionOperation('cancel', ticket.id, ticket.req.sessionId, mysqlPool, 'FORCEDOUT', {});
         } else if (((td.hours * 60) + td.minutes) > (forceCancelHours * 60)) {
           logger.log(ticket.req.sessionId+': WARNING: Session was forced to cancel but it is still running. Forcing Termination');
