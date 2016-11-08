@@ -6,7 +6,6 @@ var nconf = require('nconf');
 var AWS = require('aws-sdk');
 var _ = require('lodash');
 var Table = require('cli-table');
-var io = require('socket.io-client');
 var env = process.env;
 var nt = require(path.join(__dirname, './lib/tools'));
 var ec2;
@@ -27,7 +26,7 @@ program
    .command('showimages')
    .alias('images')
    .description('show current machine images')
-   .option("-i, --images <ids>", "show specific ids from a comma separated list", list, [])
+   .option('-i, --images <ids>', 'show specific ids from a comma separated list', list, [])
    .action(function(options){
      awsSetup(program);
 
@@ -59,7 +58,7 @@ program
            });
            console.log(table.toString());
          } else {
-             console.log("No images found");
+             console.log('No images found');
          }
        }
      });
@@ -74,10 +73,10 @@ program
    .command('showinstances')
    .alias('instances')
    .description('show current machine instances')
-   .option("-i, --instances <ids>", "show specific ids from a comma separated list", list, [])
-   .option("-f, --full", "Display full details")
-   .option("-k, --filterkey <fk>", "Filter key ")
-   .option("-v, --filtervalues <fv>", "Filter values from a comma separated list", list, [])
+   .option('-i, --instances <ids>', 'show specific ids from a comma separated list', list, [])
+   .option('-f, --full', 'Display full details')
+   .option('-k, --filterkey <fk>', 'Filter key ')
+   .option('-v, --filtervalues <fv>', 'Filter values from a comma separated list', list, [])
    .action(function(options){
      awsSetup(program);
 
@@ -114,7 +113,7 @@ program
                var n = inst.PrivateDnsName || '';
                if (inst.Tags) {
                  inst.Tags.forEach(function(t) {
-                   if (t.Key === "Name") {
+                   if (t.Key === 'Name') {
                      n = t.Value;
                    }
                  });
@@ -136,7 +135,7 @@ program
              console.log(table.toString());
            }
          } else {
-           console.log("No instances found");
+           console.log('No instances found');
          }
        }
      });
@@ -152,7 +151,7 @@ program
    .command('terminate')
    .alias('term')
    .description('terminate instances')
-   .option("-i, --instances <ids>", "terminate specific ids from a comma separated list", list, [])
+   .option('-i, --instances <ids>', 'terminate specific ids from a comma separated list', list, [])
    .action(function(options){
      awsSetup(program);
 
@@ -177,7 +176,7 @@ program
    .command('showvolumes')
    .alias('volumes')
    .description('show current volumes')
-   .option("-v, --volumes <ids>", "show specific ids from a comma separated list", list, [])
+   .option('-v, --volumes <ids>', 'show specific ids from a comma separated list', list, [])
    .action(function(options){
      awsSetup(program);
 
@@ -210,7 +209,7 @@ program
            });
            console.log(table.toString());
          } else {
-             console.log("No volumes found");
+             console.log('No volumes found');
          }
        }
      });
@@ -225,8 +224,8 @@ program
    .command('createvolume')
    .alias('volume')
    .description('create a volume')
-   .option("-z, --zone <name>", "Availability zone name")
-   .option("-s, --size <size>", "The volume size in GB", parseInt)
+   .option('-z, --zone <name>', 'Availability zone name')
+   .option('-s, --size <size>', 'The volume size in GB', parseInt)
    .action(function(options){
 
      if ((isNaN(options.size)) || (options.size <=0) || (options.size > 1024)) {
@@ -261,7 +260,7 @@ program
    .command('createsnapshot')
    .alias('snapshot')
    .description('create a snapshot of a volume')
-   .option("-v, --volume <id>", "A volume id")
+   .option('-v, --volume <id>', 'A volume id')
    .option('-n, --note [note]', 'Snapshot description note')
    .action(function(options){
      awsSetup(program);
@@ -286,7 +285,7 @@ program
    .command('createtag')
    .alias('tag')
    .description('create a tag for a resource')
-   .option("-r, --resource <id>", "A resource id")
+   .option('-r, --resource <id>', 'A resource id')
    .option('-k, --key [key]', 'The key')
    .option('-v, --value [value]', 'The value')
    .action(function(options){
@@ -394,16 +393,20 @@ function KillMachines(machines, cb) {
       if (err) {
         setTimeout(function() {callback({machines : machines, err : err}, null);}, 3000);
       } else {
-        callback(null, '')
+        callback(null, '');
       }
     });
   }
 
   async.retry(600, _TerminateMachines, function(err, result) {
     if (err) {
-      try {err.machines = err.machines.join(); } catch (e) {}
-      logger.log('Warning: Could not terminate machine(s):' + err.machines);
-      logger.log(util.inspect(err));
+      try {
+        err.machines = err.machines.join();
+      } catch (e) {
+        // empty line
+      }
+      console.log('Warning: Could not terminate machine(s):' + err.machines);
+      console.log(util.inspect(err));
     }
     cb(err, result);
   });
