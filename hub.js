@@ -46,7 +46,7 @@ var dns           = require('./lib/dns');
 var UUID       = require('node-uuid');
 var exec       = require('child_process').exec;
 var tmp        = require('tmp');
-var time       = require('time')(Date);
+var moment     = require('moment-timezone');
 var timediff   = require('timediff');
 var async      = require('async');
 var envconf    = new nconf.Provider();
@@ -2755,17 +2755,18 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
             }
           }
           if (timezone) {
+            if (moment.tz.names().indexOf(timezone) === -1) {
+              timezone = 'UTC';
+            }
             if ((record.started) && (record.started !== '')) {
-              var dts = new Date(record.started);
-              dts.setTimezone(timezone);
-              record.started = dts.toString();
+              var dts = moment( ((record.started).replace(/\//g, '-'))).tz(timezone);
+              record.started = dts.format("ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)");
             } else {
               record.started = 'N/A';
             }
             if ((record.completed) && (record.completed !== '')) {
-              var dtc = new Date(record.completed);
-              dtc.setTimezone(timezone);
-              record.completed = dtc.toString();
+              var dtc = moment( ((record.completed).replace(/\//g, '-'))).tz(timezone);
+              record.completed = dtc.format("ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)");
             } else {
               record.completed = 'N/A';
             }
