@@ -39,6 +39,7 @@
   "xterm" : "NO",
   "staticUserData" : {
     "TIMEZONE" : "UTC",
+    "STUNNEL" : "YES",
     "LOGO_BIG.png" : "https://www.nefelus.com/nefelus.png",
     "LOGO_SMALL.png" : "https://www.nefelus.com/nefelus_small.png",
     "LOGO_NEFELUS_BIG.png" : "https://www.nefelus.com/nefelus.png",
