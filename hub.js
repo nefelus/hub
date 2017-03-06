@@ -1068,7 +1068,7 @@ function startMaster(ticket, cb) {
   }
 
   if (toolAdditionalMountPoints !== 0) {
-    allIds.push(toolAdditionalMountPoints.split(','));
+    allIds = allIds.concat(toolAdditionalMountPoints);
   }
 
   var dataTypes;
@@ -1106,7 +1106,7 @@ function startMaster(ticket, cb) {
     }
 
     if (runasToolAdditionalMountPoints !== 0) {
-      allIds.push(runasToolAdditionalMountPoints.split(','));
+      allIds = allIds.concat(runasToolAdditionalMountPoints);
     }
 
     dataTypes.forEach(function(dt) {
