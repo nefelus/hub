@@ -20,6 +20,7 @@
   "timezone" : "Asia/Tokyo",
   "setloginuser" : false,
   "setsecgroups" : false,
+  "hasAutoAssignFloatingIp" : true,
   "database" : {
      "host" : "gitlab.nefelus.com"
    , "port" : 3306

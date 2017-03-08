@@ -132,6 +132,7 @@ var securityGroup;
 var workerUsername;
 var setloginuser;
 var setsecgroups;
+var hasAutoAssignFloatingIp;
 var noVNCdebug;
 
 var hubType;
@@ -416,6 +417,7 @@ function loadConfig() {
   securityGroup = mainconf.get('aws:ec2:securityGroup') || 'default';
   setloginuser = mainconf.get('setloginuser') || false;
   setsecgroups = mainconf.get('setsecgroups') || false;
+  hasAutoAssignFloatingIp = mainconf.get('hasAutoAssignFloatingIp') || true;
   noVNCdebug = mainconf.get('noVNCdebug') || false;
   workerUsername = mainconf.get('nefelus:username');
   logURLproto = mainconf.get('nefelus:logURL:protocol');
@@ -1175,7 +1177,7 @@ function startMaster(ticket, cb) {
 
   allShares.forEach(function(n, i) {
     if ((n.fstype !== '') && (n.location !== '') && (n.mountPoint !== '')) {
-      //'fstype':'nfs','location':'10.0.0.2:/tools/icscape','mountParams':null,'mountPoint':'/tools/icscape'}
+      //'fstype':'nfs','location':'10.0.0.2:/tools/icscape','mountParams':null,'mountPoint':'/tools/icscape'
       logger.log(ticket.req.sessionId+': share = '+ n.location + ' ' + n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : ''));
       userData[n.fstype + i] = n.location + ' '+ n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : ' ro');
       userData['h' + n.fstype + i] = n.location;
@@ -1210,6 +1212,7 @@ function startMaster(ticket, cb) {
           logger.log('Failed to start instance for ' + ticket.req.sessionId);
           cb(err, null);
         } else {
+/*
           if (data) {
             getMachinesInfo(data, function(err, data) {
               if (err) {
@@ -1218,6 +1221,48 @@ function startMaster(ticket, cb) {
               } else {
                 ticket.machineStarted = new Date();
                 cb(null, data);
+              }
+            });
+          } else {
+            cb(null, null);
+          }
+*/
+          if (data) {
+
+            async.each(data, function(item, callback) {
+
+              associateNextFreeAddress(item, hasAutoAssignFloatingIp, function(err, resp) {
+                if (err === null) {
+                  logger.log(ticket.req.sessionId + ': IP '+resp.address+' associated to '+resp.instance);
+                  callback();
+                } else {
+                  logger.log(ticket.req.sessionId + ': Error while associating IP address to : '+resp.instance+' : '+util.inspect(err, {depth:null}));
+                  callback(err);
+                }
+              });
+
+            },
+            function (err) {
+              if (err) {
+                // One of the associations produced an error. Kill machines and let system retry later.
+                KillMachines(data, function (err, killedMachines) {
+                  if (err) {
+                    logger.log(ticket.req.sessionId + ': Failed to terminate instance ' + killedMachines.join());
+                  } else {
+                    logger.log(ticket.req.sessionId + ': Machines ' + killedMachines.join() + ' terminated');
+                  }
+                  cb(null, null); // This will cause to retry session later due to limited resources
+                });
+              } else {
+                getMachinesInfo(data, function(err, machineinfo) {
+                  if (err) {
+                    logger.log('Failed to get machine info for ' + ticket.req.sessionId);
+                    cb(err, null); // FIXME: check err, data value
+                  } else {
+                    ticket.machineStarted = new Date();
+                    cb(null, machineinfo);
+                  }
+                });
               }
             });
           } else {
@@ -1429,16 +1474,13 @@ function getMachinesInfo(machines, cb) {
         if (! err) {
           instances = extractInstances(data.Reservations);
           for (var m = 0; m < instances.length; m++) {
-            mi = {};
-
-            mi.instanceId = instances[m].InstanceId;
-            mi.privateDnsName = instances[m].PrivateDnsName;
-            mi.dnsName = instances[m].PublicDnsName;
-            mi.ip = instances[m].PrivateIpAddress;
-            mi.publicIp = instances[m].PublicIpAddress;
-             //FIXME : If we associate an IP and do not rely on the stack to get the public IP then
-             //        the following line should change.
-            if ((instances[m].PublicIpAddress !== undefined) && (instances[m].PublicIpAddress !== null)) {
+            if ((instances[m].PublicIpAddress !== undefined) && (instances[m].PublicIpAddress !== null) && (instances[m].PublicIpAddress !== '')) {
+              mi = {};
+              mi.instanceId = instances[m].InstanceId;
+              mi.privateDnsName = instances[m].PrivateDnsName;
+              mi.dnsName = instances[m].PublicDnsName;
+              mi.ip = instances[m].PrivateIpAddress;
+              mi.publicIp = instances[m].PublicIpAddress;
               machinesFound++;
               machinesInfo.push(mi);
             }
@@ -1465,6 +1507,82 @@ function extractInstances(reservations) {
     });
   });
   return instances;
+}
+
+function associateNextFreeAddress(instanceId, auto, cb) {
+
+  // passthrough
+  if (auto === true) {
+    return cb(null, {instance: instanceId, address: 'auto'});
+  }
+
+  getFreeAddress(function(err, address) {
+    if (err) {
+      return cb(err, {instance: instanceId, address: false});
+    } else {
+
+      if (address === null) {
+        return cb('Free IP not available', {instance: instanceId, address: null});
+      }
+
+      var count = 0;
+      var addressAssociated = false;
+
+      async.whilst(
+        function () { return ((addressAssociated === false) && (count < EC2_MAX_TRIES)); },
+        function (callback) {
+          count++;
+          var args = {
+              InstanceId : instanceId,
+              PublicIp   : address
+          };
+
+          ec2.associateAddress(args, function(err, data) {
+            if (! err) {
+              addressAssociated = true;
+            }
+          });
+          setTimeout(callback, EC2_TIMEOUT);
+        },
+        function (err) {
+          if (addressAssociated === true) {
+            cb(null, {instance: instanceId, address: address});
+          } else {
+            cb('Error or incomplete response', {instance: instanceId, address: false});
+          }
+        }
+      );
+    }
+  });
+}
+
+function getFreeAddress(cb) {
+  var count = 0;
+  var address = null;
+  var addressFound = false;
+
+  async.whilst(
+    function () { return ((addressFound === false) && (count < EC2_MAX_TRIES)); },
+    function (callback) {
+      count++;
+      var args = {
+        Filters : [{ Name : 'instance-id', Values : ['']}]
+      };
+
+      ec2.describeAddresses(args, function(err, data) {
+        if (! err) {
+          if ((data.Addresses) && (data.Addresses.length)) {
+            addressFound = true;
+            address = data.Addresses[data.Addresses.length-1].PublicIp;
+          }
+        }
+      });
+      setTimeout(callback, EC2_TIMEOUT);
+    },
+    function (err) {
+      cb (((addressFound === true) ? null : 'Error or incomplete response'), address);
+    }
+  );
 }
 
 function InstanceHealthCheck(instanceId, sessionId, actions) {
