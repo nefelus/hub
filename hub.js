@@ -2511,6 +2511,17 @@ io.sockets.on('connection', function (socket) {
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
       logger.log(sessionId + ': Got UPLOAD_FINISHED with status : ' + status);
+      if (msg.sizes) {
+        logger.log(sessionId + ': UPLOADED home='+msg.sizes.home+ ',data='+msg.sizes.data+' bytes.');
+        logger.log(sessionId + ': UPLOADED home='+msg.sizes.homecnt+ ',data='+msg.sizes.datacnt+' files.');
+        var t = parseInt(msg.sizes.total, 10) / 1024.0; // Kilobytes
+        var e = parseInt(msg.elapsed, 10) / 1.0;
+        if (e !== 0) {
+          logger.log(sessionId + ': UPLOADED total='+msg.sizes.total+' bytes, '+msg.sizes.totalcnt+' files in '+msg.elapsed+' secs, rate='+Math.round(t/e)+' KBps.');
+        } else {
+          logger.log(sessionId + ': UPLOADED total='+msg.sizes.total+' bytes, '+msg.sizes.totalcnt+' files in '+msg.elapsed+' secs. So fast!');
+        }
+      }
 
       var myticket = getTicketIdBySessionId(sessionId);
       var masterTicket = msg.ticket || null;
