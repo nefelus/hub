@@ -2405,12 +2405,13 @@ io.sockets.on('connection', function (socket) {
       logger.log(sessionId + ': Got DOWNLOAD_FINISHED with status : ' + status);
       if (msg.sizes) {
         logger.log(sessionId + ': DOWNLOADED home='+msg.sizes.home+ ',data='+msg.sizes.data+',tool='+msg.sizes.tool+' bytes.');
+        logger.log(sessionId + ': DOWNLOADED home='+msg.sizes.homecnt+ ',data='+msg.sizes.datacnt+',tool='+msg.sizes.toolcnt+' files.');
         var t = parseInt(msg.sizes.total, 10) / 1024.0; // Kilobytes
         var e = parseInt(msg.elapsed, 10) / 1.0;
         if (e !== 0) {
-          logger.log(sessionId + ': DOWNLOADED total='+msg.sizes.total+' bytes in '+msg.elapsed+' secs, rate='+Math.round(t/e)+' KBps.');
+          logger.log(sessionId + ': DOWNLOADED total='+msg.sizes.total+' bytes, '+msg.sizes.totalcnt+' files in '+msg.elapsed+' secs, rate='+Math.round(t/e)+' KBps.');
         } else {
-          logger.log(sessionId + ': DOWNLOADED total='+msg.sizes.total+' bytes in '+msg.elapsed+' secs. So fast!');
+          logger.log(sessionId + ': DOWNLOADED total='+msg.sizes.total+' bytes, '+msg.sizes.totalcnt+' files in '+msg.elapsed+' secs. So fast!');
         }
       }
 
