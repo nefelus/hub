@@ -8,6 +8,19 @@ OTHER_FILES = package.json
 CONFIGS = config.json
 JX_FILES = hub.jxp nef.jxp nef-com.jxp nef-hub.jxp
 
+OBFUSCATOR_PARAMS = --disableConsoleOutput false --selfDefending true --stringArray true --stringArrayEncoding base64 --stringArrayThreshold 0.75 --debugProtection true --debugProtectionInterval false --controlFlowFlattening true --controlFlowFlatteningThreshold 0.75
+
+obfdist: obfdistclean
+	mkdir -p obfdist/hub/lib
+	for f in $(SRC_FILES); do \
+		javascript-obfuscator $$f -o "obfdist/hub/$$f" $(OBFUSCATOR_PARAMS) ; \
+	done;
+	cp $(CONFIGS) $(OTHER_FILES) obfdist/hub
+	( cd obfdist; tar zcf hub.tgz hub )
+
+obfdistclean:
+	rm -rf obfdist
+
 lint:
 	for f in $(SRC_FILES); do \
 		echo "--- $$f ---"; \
@@ -52,5 +65,3 @@ jxdistclean:
 	rm -rf jxdist
 
 .PHONY: all
-
-

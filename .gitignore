@@ -1,6 +1,7 @@
 node_modules
 dist
 jxdist
+obfdist
 tmp
 cert
 old
