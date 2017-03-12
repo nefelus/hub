@@ -2342,7 +2342,7 @@ io.sockets.on('connection', function (socket) {
 
           Tickets[myticket].consoleCheckTimer = setInterval(function() {
             nt.isAliveUrl({'url' : ((Tickets[myticket].vncConsole !== '') ? Tickets[myticket].vncConsole : Tickets[myticket].logConsole),
-                           'timeout' : 2000},
+                           'timeout' : 3500},
                           function(err, data) {
                             var cct = Tickets[myticket].get('consoleCheckTimes');
                             var mysqlKeys = ['LOG_VIEWER', 'VNC_VIEWER', 'LOCAL_IP', 'PUBLIC_IP']; // LOG_VIEWER was RUN_DIR
