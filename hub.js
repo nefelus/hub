@@ -2340,7 +2340,7 @@ io.sockets.on('connection', function (socket) {
         // Check if consoles are active first and then inform the frontend.
         if ((logURL !== '') || (vncURL !== '')) {
 
-          Tickets[myticket].consoleCheckTimer = setInterval(function() {
+          Tickets[myticket].consoleCheckTimer = setInterval(function consoleCheckTimerFunc() {
             nt.isAliveUrl({'url' : ((Tickets[myticket].vncConsole !== '') ? Tickets[myticket].vncConsole : Tickets[myticket].logConsole),
                            'timeout' : 3500},
                           function(err, data) {
@@ -2371,7 +2371,8 @@ io.sockets.on('connection', function (socket) {
                               }
                             }
                           });
-          }, CONSOLE_CHECK_INTERVAL);
+            return consoleCheckTimerFunc;
+          }(), CONSOLE_CHECK_INTERVAL);
         } else {
           var mysqlKeys = ['LOG_VIEWER', 'VNC_VIEWER', 'LOCAL_IP', 'PUBLIC_IP']; // LOG_VIEWER was RUN_DIR
           var mysqlValues = [Tickets[myticket].logConsole, Tickets[myticket].vncConsole,
