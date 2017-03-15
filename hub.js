@@ -23,6 +23,7 @@ memwatch.on('leak', function(info) {
 });
 */
 
+var NSLM_BYPASS = true; // NOTE: Setting it to false activates nslm license checks (!)
 var NEFELUS_HUB_FEATURE = 'af04a46364987c32b0664750ea50d7df'; // Nefelus HUB 1.0
 
 var thepackage = require('./package.json');
@@ -171,7 +172,7 @@ var forceCancelHours = 0;
 var cancelHoursTimer = null;
 var licserverInfo;
 var nslm = null;
-var nslmSessionIsActive = false;
+var nslmSessionIsActive = NSLM_BYPASS; // If we bypass license checking, it permits hub operations.
 
 loadConfig();
 
@@ -463,32 +464,34 @@ function loadConfig() {
   setupMySQL(mysqlConfig);
   emailTemplates = mainconf.get('emailTemplates') || [];
   MySQLParamsLoaded = false; // Quotas are loaded in main SQL loop.
-  licserverInfo = mainconf.get('nslm') || null;
-  if ((licserverInfo === null) ||
-      (! ((licserverInfo.baseURL) && (typeof licserverInfo.baseURL === 'string') && (licserverInfo.baseURL !== '') &&
-          (licserverInfo.accessKey) && (typeof licserverInfo.accessKey === 'string') && (licserverInfo.accessKey !== '') &&
-          (licserverInfo.secretKey) && (typeof licserverInfo.secretKey === 'string') && (licserverInfo.secretKey !== '')))) {
-    logger.raw.log('License Manager info not set correctly. Exiting...');
-    process.exit(2);
-  } else {
-    if (nslm === null) {
-      nslm = new _nslm({ licenseServer : licserverInfo.baseURL,
-                         accessKey : licserverInfo.accessKey,
-                         secretKey : licserverInfo.secretKey,
-                         feature : NEFELUS_HUB_FEATURE
-                       });
-      nslm.start();
-      nslm.on('change', function(active) {
-        logger.log('nslm active =', active);
-        nslmSessionIsActive = active;
-      });
+  if (! NSLM_BYPASS) {
+    licserverInfo = mainconf.get('nslm') || null;
+    if ((licserverInfo === null) ||
+        (! ((licserverInfo.baseURL) && (typeof licserverInfo.baseURL === 'string') && (licserverInfo.baseURL !== '') &&
+            (licserverInfo.accessKey) && (typeof licserverInfo.accessKey === 'string') && (licserverInfo.accessKey !== '') &&
+            (licserverInfo.secretKey) && (typeof licserverInfo.secretKey === 'string') && (licserverInfo.secretKey !== '')))) {
+      logger.raw.log('License Manager info not set correctly. Exiting...');
+      process.exit(2);
     } else {
-      nslm.end(function(err, data) { // checkin old session and then start a new one.
-        nslm.set('licenseServer', licserverInfo.baseURL);
-        nslm.set('accessKey', licserverInfo.accessKey);
-        nslm.set('secretKey', licserverInfo.secretKey);
+      if (nslm === null) {
+        nslm = new _nslm({ licenseServer : licserverInfo.baseURL,
+                           accessKey : licserverInfo.accessKey,
+                           secretKey : licserverInfo.secretKey,
+                           feature : NEFELUS_HUB_FEATURE
+                         });
         nslm.start();
-      });
+        nslm.on('change', function(active) {
+          logger.log('nslm active =', active);
+          nslmSessionIsActive = active;
+        });
+      } else {
+        nslm.end(function(err, data) { // checkin old session and then start a new one.
+          nslm.set('licenseServer', licserverInfo.baseURL);
+          nslm.set('accessKey', licserverInfo.accessKey);
+          nslm.set('secretKey', licserverInfo.secretKey);
+          nslm.start();
+        });
+      }
     }
   }
 }
@@ -1859,7 +1862,7 @@ var dispatcher = function dispatcher () {
         if (totalPendingFound > 0) {
           pendingWereNone = false;
           pendingNoneCnt  = 0;
-          logger.log(records.length + ' pending and ' + totalRunningFound + ' running jobs. State=' + mystate + ', license=' + (nslmSessionIsActive ? 'ok' : 'NOT ok'));
+          logger.log(records.length + ' pending and ' + totalRunningFound + ' running jobs. State=' + mystate + ((! NSLM_BYPASS) ? (', license=' + (nslmSessionIsActive ? 'ok' : 'NOT ok')) : ''));
           showProcessStats();
           for (i = 0; i < records.length; i++) {
             jobType = 'batch';
@@ -2154,7 +2157,7 @@ var dispatcher = function dispatcher () {
           }
         } else {
           if ((pendingWereNone === false) || ((pendingNoneCnt % PENDING_NONE_TIMES_TO_SKIP) == 0)) {
-            logger.log('0 pending and ' + totalRunningFound + ' running jobs. ' + 'State=' + mystate + ', license=' + (nslmSessionIsActive ? 'ok' : 'NOT ok'));
+            logger.log('0 pending and ' + totalRunningFound + ' running jobs. State=' + mystate + ((! NSLM_BYPASS) ? (', license=' + (nslmSessionIsActive ? 'ok' : 'NOT ok')) : ''));
             showProcessStats();
           }
           pendingWereNone = true;
