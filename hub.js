@@ -1386,6 +1386,7 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
           cb(null, null);
         } else {
           instanceIds.forEach(function(id) {
+            logger.log(sessionId + ' Machine '+id+' spawned.');
             function _setMachineTags(callback, results) {
               setMachineTags(id, hubType, sessionId, function(err, data) {
                 if (err) {
