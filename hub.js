@@ -285,7 +285,8 @@ function loadConfig() {
               ssl : false
             },
             ignoreOldSessions: false,
-            sessionsPath : '/var/run/hub'
+            sessionsPath : '/var/run/hub',
+            hasAutoAssignFloatingIp : true
           });
 
   timezone = mainconf.get('timezone') || null;
@@ -418,7 +419,7 @@ function loadConfig() {
   securityGroup = mainconf.get('aws:ec2:securityGroup') || 'default';
   setloginuser = mainconf.get('setloginuser') || false;
   setsecgroups = mainconf.get('setsecgroups') || false;
-  hasAutoAssignFloatingIp = mainconf.get('hasAutoAssignFloatingIp') || true;
+  hasAutoAssignFloatingIp = mainconf.get('hasAutoAssignFloatingIp');
   noVNCdebug = mainconf.get('noVNCdebug') || false;
   workerUsername = mainconf.get('nefelus:username');
   logURLproto = mainconf.get('nefelus:logURL:protocol');
@@ -1268,9 +1269,9 @@ function startMaster(ticket, cb) {
                             // One of the associations produced an error. Kill machines and let system retry later.
                             KillMachines(data, function (err, killedMachines) {
                               if (err) {
-                                logger.log(ticket.req.sessionId + ': Failed to terminate instance ' + killedMachines.join());
+                                logger.log(ticket.req.sessionId + ': Failed to terminate instance ' + data.join());
                               } else {
-                                logger.log(ticket.req.sessionId + ': Machines ' + killedMachines.join() + ' terminated');
+                                logger.log(ticket.req.sessionId + ': Machines ' + data.join() + ' terminated');
                               }
                               cb(null, null); // This will cause to retry session later due to limited resources
                             });
@@ -1545,23 +1546,26 @@ function associateNextFreeAddress(instanceId, auto, cb) {
 
   // passthrough
   if (auto === true) {
-    return cb(null, {instance: instanceId, address: 'auto'});
+    cb(null, {instance: instanceId, address: 'auto'});
+    return;
   }
 
   getFreeAddress(function(err, address) {
     if (err) {
-      return cb(err, {instance: instanceId, address: false});
+      cb(err, {instance: instanceId, address: false});
+      return;
     } else {
 
       if (address === null) {
-        return cb('Free IP not available', {instance: instanceId, address: null});
+        cb('Free IP not available', {instance: instanceId, address: null});
+        return;
       }
 
       var count = 0;
       var addressAssociated = false;
 
       async.whilst(
-        function () { return ((addressAssociated === false) && (count < EC2_MAX_TRIES)); },
+        function () { return ((addressAssociated === false) && (count < 5)); },
         function (callback) {
           count++;
           var args = {
@@ -1594,18 +1598,22 @@ function getFreeAddress(cb) {
   var addressFound = false;
 
   async.whilst(
-    function () { return ((addressFound === false) && (count < EC2_MAX_TRIES)); },
+    function () { return ((addressFound === false) && (count < 5)); },
     function (callback) {
       count++;
       var args = {
-        Filters : [{ Name : 'instance-id', Values : ['']}]
+        //Filters : [{ Name : 'instance-id', Values : ['']}] // WARNING: on Openstacks's ec2api this does not work
       };
 
       ec2.describeAddresses(args, function(err, data) {
         if (! err) {
+          addressFound = true;
           if ((data.Addresses) && (data.Addresses.length)) {
-            addressFound = true;
-            address = data.Addresses[data.Addresses.length-1].PublicIp;
+            for (var a = data.Addresses.length-1; a >= 0; a--) {
+              if (! data.Addresses[a].InstanceId) {
+                address = data.Addresses[data.Addresses.length-1].PublicIp;
+              }
+            }
           }
         }
       });
@@ -2132,6 +2140,8 @@ var dispatcher = function dispatcher () {
                                             updateStatus(mysqlPool, hubreqid, 'SETUP', mysqlKeys, mysqlValues);
                                             logger.log(sessionId + ': Master ' + data[0].instanceId + ' started successfully');
                                           } else {
+                                            t.deAssociate();
+                                            t = null;
                                             if (data === null) {
                                               // if startMaster returns null data put back in queue
                                               // FIXME : skip for some cycles...
@@ -2142,8 +2152,6 @@ var dispatcher = function dispatcher () {
                                               logger.log(sessionId + ': ERROR SETTING UP JOB, startMachines returned empty value');
                                               mysqlKeys = ['NOTE'];
                                               mysqlValues = ['Error setting up job'];
-                                              t.deAssociate();
-                                              t = null;
                                               updateStatus(mysqlPool, hubreqid, 'ERROR', mysqlKeys, mysqlValues, function(err, data) {
                                                 if (!err) {
                                                   sendSessionStatusEmail(sessionId, hubreqid, mysqlPool);
