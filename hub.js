@@ -44,7 +44,7 @@ var fs         = require('fs');
 var AWS = require('aws-sdk');
 
 var dns           = require('./lib/dns');
-var UUID       = require('node-uuid');
+var UUID       = require('uuid');
 var exec       = require('child_process').exec;
 var tmp        = require('tmp');
 var moment     = require('moment-timezone');
