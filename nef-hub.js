@@ -135,20 +135,23 @@ function hubSetup(program) {
 
 function _callHub(cmd, options) {
   //logger.log('Connecting to '+hubServer);
-  var hubOptions = {reconnect: true};
-  if (hubServer.substr(0,5) == 'https') {
-    hubOptions['secure'] = true;
-  }
+  var hubOptions = {
+      reconnection: true,
+      reconnectionDelay:1000,
+      reconnectionDelayMax:5000,
+      reconnectionAttempts:Infinity
+  };
   try {
     socket = io.connect(hubServer, hubOptions);
   } catch(e) {};
 
+  var errorHandler = function errorHandler(error) {
+    logger.log('Received an error : '+util.inspect(error, {depth:null}) || 'no further info provided.');
+  }
+
   if (socket) {
-    socket.on('connect_failed', function (msg) {
-      console.log(msg || 'Received an error');
-    }).on('error', function (msg) {
-      console.log(msg || 'Received an error');
-    });
+    socket.on('connect_error', errorHandler);
+    socket.on('reconnect_error', errorHandler);
 
     socket.on('disconnect', function() {
       process.exit();
