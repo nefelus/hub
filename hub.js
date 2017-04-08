@@ -2266,52 +2266,27 @@ var io;
 if (sslOptions !== false) {
   logger.log('SSL enabled');
   server = https.createServer(sslOptions);
-  sslOptions['destroy buffer size'] = Infinity;
-  io = require('socket.io').listen(server, sslOptions);
 } else {
   logger.log('SSL not enabled');
   server = http.createServer();
-  io = require('socket.io').listen(server, {'destroy buffer size': Infinity});
 }
 
-//var io = require('socket.io').listen(hubPort);
-//server.listen(hubPort, hubHost); // Does not work!
+io = require('socket.io').listen(server, {maxHttpBufferSize: Infinity, transports:['websocket', 'polling']});
+
 server.listen(hubPort);
 
 logger.log('Socket.io listening on ' + hubProtocol + '://' + hubHost + ':' + hubPort);
 
-io.configure('production', function() {
-  io.enable('browser client etag');
-  io.set('log level', 1);
-  io.set('transports', [
-      'websocket'
-  //, 'flashsocket'
-  //, 'htmlfile'
-  //, 'xhr-polling'
-  //, 'jsonp-polling'
-  ]);
-});
+io.on('connection', function (socket) {
 
-io.configure('development', function() {
-  io.enable('browser client etag');
-  io.set('log level', 1);
-  io.set('transports', ['websocket']);
-});
-
-io.sockets.on('connection', function (socket) {
-
-  logger.log('Got a new connection, socket=' + socket.id + ', remoteAddress=' +
-             ((socket.manager && socket.manager.handshaken && socket.manager.handshaken[socket.id]) ? (socket.manager.handshaken[socket.id].address.address
-             +':'+socket.manager.handshaken[socket.id].address.port) : ''));
+  logger.log('Got a new connection, socket=' + socket.id + ', remoteAddress=' + ((socket.handshake) ? (socket.handshake.address) : ''));
 
   socket.on('disconnect', function () {
-    logger.log('Host ' + ((socket.instance) ? socket.instance : 'unknown') +
-               ' disconnected, socket=' + socket.id + ', session=' +
-               ((socket.sessionId) ? socket.sessionId : 'unknown') + ', remoteAddress=' +
-               ((socket.manager && socket.manager.handshaken && socket.manager.handshaken[socket.id]) ? (socket.manager.handshaken[socket.id].address.address
-               +':'+socket.manager.handshaken[socket.id].address.port) : ''));
+    logger.log('Host ' + ((socket.nefinstanceId) ? socket.nefinstanceId : 'unknown') + ' disconnected, socket=' + socket.id +
+               ', session=' + ((socket.nefsessionId) ? socket.nefsessionId : 'unknown') +
+               ', remoteAddress=' + ((socket.handshake) ? (socket.handshake.address) : ''));
 
-    var sessionId = socket.sessionId;
+    var sessionId = socket.nefsessionId;
     if (sessionId) {
       var myticket = getTicketIdBySessionId(sessionId);
       if (myticket !== null) {
@@ -2329,9 +2304,9 @@ io.sockets.on('connection', function (socket) {
       var lastMsgData = lastMsg.data || {};
       var myticket;
       logger.log('Got HEARTBEAT from socket '+socket.id+' instance "' + instance + '"' + ((sessionId !== '') ? ' serving session "' + sessionId + '"' : ''));
-      //logger.log('instance', socket.instance || '');
-      //logger.log('session', socket.session || '');
-      //logger.log('hostname', socket.hostname || '');
+      //logger.log('instance', socket.nefinstanceId || '');
+      //logger.log('session', socket.nefsessionId || '');
+      //logger.log('hostname', socket.nefhostname || '');
       if (sessionId !== '') {
         myticket = getTicketIdBySessionId(sessionId);
         var masterTicket = msg.ticket || null;
@@ -2784,8 +2759,9 @@ io.sockets.on('connection', function (socket) {
 
   socket.on('admincmd', function (data) {
     logger.log('Got ADMINCMD : ' + data);
-    socket.set('instance', '', function () {});
-    socket.set('session', 'admin', function () {});
+    socket.nefinstanceId = '-';
+    socket.nefsessionId = 'admin';
+    socket.nefhostname = '-';
     if (nt.isSafeJSON(data)) {
       var cmd = JSON.parse(data);
       var mesg = {status:'', message : ''};
@@ -2879,7 +2855,19 @@ function middleSessionOperation(type, id, sid, sqlpool, status,  msgParams) {
           msg[attr] = msgParams[attr];
         }
       }
-      io.sockets.socket(peer).emit(type, JSON.stringify(msg), parseAck);
+
+      // Send to particular socket
+      // for new socket.io see : https://github.com/socketio/socket.io/issues/1618
+      // or io.to(peer).emit() might work...
+      if (io.sockets.connected[peer]) {
+        io.sockets.connected[peer].emit(type, JSON.stringify(msg), parseAck);
+      } else {
+        try {
+          io.to(peer).emit(type, JSON.stringify(msg), parseAck);
+        } catch (eio) {
+          logger.log('Socket '+peer+' is not found in connected peers.');
+        }
+      }
       updateStatus(sqlpool, id, status);
     } else {
       logger.log('Remote socket for session ' + sid + ' not found');
@@ -3405,9 +3393,9 @@ function handleHello(socket, instanceId, ticket, msg) {
       }
     }
 
-    socket.set('instance', instanceId, function () {});
-    socket.set('session', sessionId, function () {});
-    socket.set('hostname', servername, function () {});
+    socket.nefinstanceId = instanceId;
+    socket.nefsessionId = sessionId;
+    socket.nefhostname = servername;
     if (Tickets[ticket].get('cancelPending') === false) {
       socket.emit('welcome', JSON.stringify(mesg), parseAck);
     }
