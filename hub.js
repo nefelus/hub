@@ -1685,6 +1685,7 @@ function dupTicket(id) {
       }
     });
     t.healthCheckTimer = null;
+    t.consoleCheckTimer = null;
     t.master.socket = null; // Do not use setMaster here!!!
   }
   return t;
