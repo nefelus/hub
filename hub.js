@@ -119,6 +119,8 @@ var mainconf = new nconf.Provider();
 var sslOptions = false;
 var sslMasterPack = false;
 var masterScripts = false;
+var installationId = '';
+var ignoreInstallationIdInFilemanagerOps = false;
 var aws;
 var awsParams = {};
 var awsAccountId;
@@ -286,6 +288,7 @@ function loadConfig() {
             },
             ignoreOldSessions: false,
             sessionsPath : '/var/run/hub',
+            ignoreInstallationIdInFilemanagerOps : false,
             hasAutoAssignFloatingIp : true
           });
 
@@ -411,6 +414,12 @@ function loadConfig() {
     masterScripts = fs.readFileSync(masterScripts);
   } else {
     masterScripts = false;
+  }
+  installationId = mainconf.get('installationId') || '';
+  ignoreInstallationIdInFilemanagerOps = mainconf.get('ignoreInstallationIdInFilemanagerOps');
+  ignoreInstallationIdInFilemanagerOps = nt.isTrue(ignoreInstallationIdInFilemanagerOps);
+  if (ignoreInstallationIdInFilemanagerOps) {
+    installationId = '';
   }
   vncLocalOnly = nt.isTrue(mainconf.get('vncLocalOnly'));
   staticUserData = mainconf.get('staticUserData') || {};
@@ -2641,7 +2650,7 @@ io.on('connection', function (socket) {
       if (status !== 'error') {
         mysqlKeys = ['OUTPUT_DIR'];
         if (status === 'ok') {
-          mysqlValues.push(nt.createSessionPath(sessionId) + 'out');
+          mysqlValues.push(nt.createSessionPath(sessionId, installationId) + 'out');
         } else if (status === 'warning') {
           mysqlValues.push('');
         }
@@ -3180,7 +3189,7 @@ function handleUploadFinished(socket, sessionId, ticket, msg) {
   if (status !== 'error') {
     mysqlKeys = ['OUTPUT_DIR'];
     if (status === 'ok') {
-      mysqlValues.push(nt.createSessionPath(sessionId) + 'out');
+      mysqlValues.push(nt.createSessionPath(sessionId, installationId) + 'out');
     } else if (status === 'warning') {
       mysqlValues.push('');
     }
@@ -3347,6 +3356,12 @@ function handleHello(socket, instanceId, ticket, msg) {
       'aws' : encrypted,
       'ticket' : masterTicket
     };
+    if (installationId !== '') {
+      cipher = crypto.createCipher('aes256', instanceId);
+      encrypted = cipher.update(installationId, 'utf8', 'hex') +
+                  cipher.final('hex');
+      mesg['installationId'] = encrypted;
+    }
     if (Tickets[ticket].get('XResolution')) {
       mesg['XResolution'] = Tickets[ticket].get('XResolution');
     }
