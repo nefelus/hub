@@ -1322,7 +1322,19 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
   for (k in userData) {
     ud = ud + '#%' + k + ':' + userData[k] + '\n';
   }
-  var udb = new Buffer(ud);
+
+  var udb;
+
+  if (typeof Buffer.from === 'function') {
+    try {
+      // Node 4.4.* Buffer.from already exists, but throws error
+      udb = Buffer.from(ud);
+    } catch (_error) {
+      udb = new Buffer(ud);
+    }
+  } else {
+    udb = new Buffer(ud);
+  }
   ud = udb.toString('base64');
   var speed = machines.getSpeed(machineId);
 
