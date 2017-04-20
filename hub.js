@@ -1631,10 +1631,10 @@ function getFreeAddress(cb) {
         if (! err) {
           addressFound = true;
           if ((data.Addresses) && (data.Addresses.length)) {
-            for (var a = data.Addresses.length-1; a >= 0; a--) {
-              if (! data.Addresses[a].InstanceId) {
-                address = data.Addresses[data.Addresses.length-1].PublicIp;
-              }
+            var _Addresses = _.filter(data.Addresses, function(o) { return typeof o.InstanceId === 'undefined'; });
+            if ((_Addresses) && (_Addresses.length)) {
+              var x = _.sample(_Addresses);
+              address = x.PublicIp;
             }
           }
         }
