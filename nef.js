@@ -34,7 +34,7 @@ if ((myshell !== 'node') && (myshell !== 'jx')) {
 
 //console.log(process.argv);
 
-myname=process.argv[1];
+var myname=process.argv[1];
 program.parse(process.argv);
 
 //console.log(program);
