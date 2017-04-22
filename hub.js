@@ -1183,6 +1183,10 @@ function startMaster(ticket, cb) {
               if ((setloginuser) && (ticket.loginuser !== 'nefelus')) {
                 userData['USERDEF'] = ticket.loginuser;
               }
+              userData['UUID'] = ticket.uuid;
+              userData['JOBTYPE'] = ticket.req.jobType;
+              userData['RESOLUTION'] = ticket.XResolution;
+              userData['DISPLAY'] = ticket.XDisplay;
 
               if (setsecgroups) {
                 var iptables = secgroups.getRules(sid.companyId, sid.projectId);
@@ -1206,11 +1210,11 @@ function startMaster(ticket, cb) {
               }
               userData['xterm'] = toolXtermSupport;
 
+              userData['totalshares'] = allShares.length;
               allShares.forEach(function(n, i) {
                 if ((n.fstype !== '') && (n.location !== '') && (n.mountPoint !== '')) {
                   //'fstype':'nfs','location':'10.0.0.2:/tools/icscape','mountParams':null,'mountPoint':'/tools/icscape'
                   logger.log(ticket.req.sessionId+': share = '+ n.location + ' ' + n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : ''));
-                  userData[n.fstype + i] = n.location + ' '+ n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : ' ro');
                   userData['h' + n.fstype + i] = n.location;
                   userData['c' + n.fstype + i] = n.mountPoint;
                   userData['p' + n.fstype + i] = (((n.mountParams!==null) && (n.mountParams!=='')) ? (n.mountParams) : 'ro');
