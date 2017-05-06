@@ -40,6 +40,8 @@ var http       = require('http');
 var https      = require('https');
 var _          = require('lodash');
 var fs         = require('fs');
+var concat     = require('concat-stream');
+var archiver   = require('archiver');
 
 var AWS = require('aws-sdk');
 
@@ -324,9 +326,47 @@ function loadConfig() {
         }
       }
     }
-    if ((ssl.masterPack) && (ssl.masterPack !== '') &&
-        (nt.isReadableSync(ssl.masterPack))) {
-      sslMasterPack = fs.readFileSync(ssl.masterPack);
+    sslMasterPack = false;
+    if ((sslKey !== '') || (sslCert !== '') || (sslCa !== '')) {
+      var concatStream = concat( function (archiveBuffer) {
+        sslMasterPack = archiveBuffer;
+      });
+
+      var archive = archiver('tar', {
+        gzip: true,
+        gzipOptions: {
+          level: 1
+        }
+      });
+
+      archive.on('error', function(err) {
+        logger.log('Error creating SSL archive for VMs!!!');
+        sslMasterPack = false;
+      });
+
+      archive.pipe(concatStream);
+
+      if (sslKey !== '') {
+        archive.append(sslKey, { name: 'key' });
+      }
+      if (sslCert !== '') {
+        archive.append(sslCert, { name: 'cert' });
+      }
+      if (sslCa !== '') {
+        var caBuf;
+        if (typeof Buffer.from === 'function') {
+          try {
+            // Node 4.4.* Buffer.from already exists, but throws error
+            caBuf = Buffer.from(sslCa);
+          } catch (_error) {
+            caBuf = new Buffer(sslCa);
+          }
+        } else {
+          caBuf = new Buffer(sslCa);
+        }
+        archive.append(caBuf, { name: 'ca' });
+      }
+      archive.finalize();
     }
     if ((sslKey !== '') && (sslCert !== '')) {
       hubProtocol = 'https';
