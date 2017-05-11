@@ -7,7 +7,6 @@
         "key" : ""
       , "cert" : ""
       , "ca" : ""
-      , "masterPack" : ""
      }
    , "sessionsPath" : "/var/run/nefelus/hub"
    , "maxRunningJobsAllowed" : 5
