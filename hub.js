@@ -1888,7 +1888,7 @@ var dispatcher = function dispatcher () {
           }
           if (MySQLParamsLoaded === false) {
             logger.log('(re)loading params');
-            loadMySQLParams(mysqlClient, lastUpdatedSettings.config, MAX_RUNNING_JOBS_ALLOWED, function(err, data) {
+            loadMySQLParams(mysqlClient, lastUpdatedSettings.config, function(err, data) {
               if (! err) {
                 MySQLParamsLoaded = true;
               } else {
@@ -3458,7 +3458,7 @@ function handleHello(socket, instanceId, ticket, msg) {
   }
 }
 
-function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWED, cb) {
+function loadMySQLParams(mysqlClient, lastUpdatedConfig, cb) {
   if (!lastUpdatedConfig) {
     cb('Not ready yet', null);
     return;
@@ -3549,18 +3549,36 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWE
                           callback(err, machineData, imageData, cloudData, toolappsData, secgroupsData);
                         });
                       } else {
-                        callback(null, machineData, imageData, cloudData, 'No need to reload secgroups');
+                        callback(null, machineData, imageData, cloudData, toolappsData, 'No need to reload secgroups');
+                      }
+                    },
+                    function(machineData, imageData, cloudData, toolappsData, secgroupsData, callback) {
+                      if ((lastUpdatedConfig['QUOTA_SESSIONS']) && (lastUpdatedConfig['QUOTA_SESSIONS']['reload'])) {
+                        quotas.loadMaxSessionsAllowed(mysqlClient, MAX_RUNNING_JOBS_ALLOWED, function(err, maxsessionsData) {
+                          err && logger.log('Quota_Sessions', err);
+                          if (! err) {
+                            logger.log('Max Sessions =',maxsessionsData);
+                            MAX_RUNNING_JOBS_ALLOWED = maxsessionsData;
+                            var nowDate = new Date();
+                            lastUpdatedConfig['QUOTA_SESSIONS']['timestamp'] = Number(nowDate.valueOf());
+                            lastUpdatedConfig['QUOTA_SESSIONS']['reload'] = false;
+                          }
+                          callback(err, machineData, imageData, cloudData, toolappsData, secgroupsData, maxsessionsData);
+                        });
+                      } else {
+                        callback(null, machineData, imageData, cloudData, toolappsData, secgroupsData, 'No need to reload maxsessions');
                       }
                     }
                   ],
-                  function(err, machineData, imageData, cloudData, toolappsData, secgroupsData) {
+                  function(err, machineData, imageData, cloudData, toolappsData, secgroupsData, maxsessionsData) {
                     if (err) {
                       logger.log('Loading from MySQL failed, will retry shortly...');
                       setTimeout(function() { callback(err, {'1' : machineData || null,
                                                              '2' : imageData || null,
                                                              '3' : cloudData || null,
                                                              '4' : toolappsData || null,
-                                                             '5' : secgroupsData || null
+                                                             '5' : secgroupsData || null,
+                                                             '6' : maxsessionsData || null
                                                             }); }, DBTIMEOUT);
                     } else {
                       logger.log('Loading from MySQL completed');
@@ -3568,7 +3586,8 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, MAX_RUNNING_JOBS_ALLOWE
                                      'images' : imageData || null,
                                      'clouds' : cloudData || null,
                                      'toolapps' : toolappsData || null,
-                                     'secgroups' : secgroupsData || null
+                                     'secgroups' : secgroupsData || null,
+                                     'maxsessions' : maxsessionsData || null
                                     });
                     }
                   }
