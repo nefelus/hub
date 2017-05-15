@@ -52,7 +52,6 @@ var tmp        = require('tmp');
 var moment     = require('moment-timezone');
 var timediff   = require('timediff');
 var async      = require('async');
-var envconf    = new nconf.Provider();
 var logger     = require('./lib/logging').logger;
 var images = require('./lib/images');
 var secgroups = require('./lib/secgroups');
@@ -63,8 +62,6 @@ var shares = require('./lib/shares');
 var toolapps = require('./lib/toolapps');
 var machines = require('./lib/machines');
 var _nslm = require('./lib/nslmlib');
-
-envconf.env();
 
 var isJX = (path.basename(process.argv[0]) === 'jx');
 var myargs = ((path.basename(process.argv[0]) === 'node') ||
@@ -99,13 +96,8 @@ var SKIP_CYCLES = 4;
 
 tmp.setGracefulCleanup();
 
-var runningMode = envconf.get('NODE_ENV') || 'production';
-logger.log('Running Mode : ' + runningMode);
+configFilename = __dirname + '/config.json';
 
-var configFilename = __dirname + '/config.json.in';
-if (runningMode === 'production') {
-  configFilename = __dirname + '/config.json';
-}
 logger.log('Config file : ' + configFilename);
 if (! nt.isReadableSync(configFilename)) {
   logger.log('Configuration file '+configFilename+' not accessible. Exiting...');
