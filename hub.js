@@ -157,8 +157,6 @@ var vncURLport;
 var cmdURLport;
 var x11IdleTimeout;
 var homeBlacklistPatterns = [];
-var sessionsPath;
-var ignoreOldSessions;
 var emailTemplates;
 var MAX_RUNNING_JOBS_ALLOWED;
 var db;
@@ -180,24 +178,9 @@ var nslmSessionIsActive = NSLM_BYPASS; // If we bypass license checking, it perm
 
 loadConfig();
 
-var hubSession = new nconf.Provider();
-if (fs.existsSync(sessionsPath + '/hubSession.json')) {
-  var stats = fs.lstatSync(sessionsPath + '/hubSession.json');
-
-  if (stats.size == 0) {
-    try {
-      fs.unlinkSync(sessionsPath + '/hubSession.json');
-    } catch (e) {
-      // empty line
-    }
-  }
-}
-hubSession.file({file: sessionsPath + '/hubSession.json'});
-
 //process.on('uncaughtException', function(err) {
   //logger.log('UNCAUGHT EXCEPTION!!!');
   //logger.log(util.inspect(err, { showHidden: true, depth: null }));
-  ////SaveSession();
 //});
 
 function mayIExit() {
@@ -238,12 +221,6 @@ process.on('SIGHUP', function () {
   logger.log('Got SIGHUP, reloading config file:' + configFilename);
   loadConfig();
 });
-
-if (ignoreOldSessions !== true) {
-  Instances = hubSession.get('Instances') || [];
-  Tickets = hubSession.get('Tickets') || [];
-  Sessions = hubSession.get('Sessions') || [];
-}
 
 var sessionStatusCodes = [
   'initialize',
@@ -288,8 +265,6 @@ function loadConfig() {
               host : 'localhost',
               ssl : false
             },
-            ignoreOldSessions: false,
-            sessionsPath : '/var/run/hub',
             ignoreInstallationIdInFilemanagerOps : false,
             hasAutoAssignFloatingIp : true
           });
@@ -479,7 +454,6 @@ function loadConfig() {
   cmdURLport = mainconf.get('nefelus:cmdURL:port');
   x11IdleTimeout = mainconf.get('nefelus:x11IdleTimeout');
   homeBlacklistPatterns = mainconf.get('nefelus:homeBlacklistPatterns') || [];
-  sessionsPath = mainconf.get('hub:sessionsPath');
   cancelHours = mainconf.get('hub:cancelHours') || 0;
   forceCancelHours = mainconf.get('hub:forceCancelHours') || ((cancelHours === 0) ? 0 : cancelHours + 2);
   if (cancelHours !== 0) {
@@ -494,7 +468,6 @@ function loadConfig() {
       cancelHoursTimer = null;
     }
   }
-  ignoreOldSessions = mainconf.get('ignoreOldSessions');
   adminEmail = mainconf.get('adminEmail');
   masterDebug = mainconf.get('nefelus:masterDebug') || false;
   MAX_RUNNING_JOBS_ALLOWED = mainconf.get('hub:maxRunningJobsAllowed') || 0;
@@ -545,24 +518,6 @@ function loadConfig() {
     }
   }
 }
-
-/*
-function SaveSession(exit) {
-  logger.log('Saving session');
-  hubSession.set('Instances', Instances);
-  hubSession.set('Tickets', Tickets);
-  hubSession.set('Sessions', Sessions);
-  hubSession.save(function(err) {
-    if (err) {
-      logger.log(err);
-    }
-    if (exit === true) {
-      logger.log('See you later alligator...');
-      process.exit();
-    }
-  });
-}
-*/
 
 function Ticket(id) {
 
