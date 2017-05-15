@@ -8,7 +8,6 @@
       , "cert" : ""
       , "ca" : ""
      }
-   , "sessionsPath" : "/var/run/nefelus/hub"
    , "maxRunningJobsAllowed" : 5
    , "cancelHours" : 0
    , "forceCancelHours" : 0
