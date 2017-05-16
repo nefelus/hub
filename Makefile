@@ -5,7 +5,7 @@ clean: node_modules
 
 SRC_FILES = api.js hub.js sqlTemplates.js lib/*.js nef.js nef-com.js nef-hub.js
 OTHER_FILES = package.json
-CONFIGS = config.json
+CONFIGS = hub.conf.in nefelus.conf.in
 JX_FILES = hub.jxp nef.jxp nef-com.jxp nef-hub.jxp
 
 OBFUSCATOR_PARAMS = --disableConsoleOutput false --selfDefending true --stringArray true --stringArrayEncoding base64 --stringArrayThreshold 0.75 --debugProtection true --debugProtectionInterval false --controlFlowFlattening true --controlFlowFlatteningThreshold 0.75

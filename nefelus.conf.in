@@ -1,0 +1,69 @@
+#
+# Nefelus Config
+#
+# This file is in TOML format (https://github.com/toml-lang/toml)
+#
+customerName = "Nefelus"
+installationId = ""
+installationType = "production"
+adminEmail = "admin@example.com"
+timezone = "UTC"
+username =  "nefelus"
+ignoreInstallationIdInFilemanagerOps = false
+
+[database]
+host = "hub.exampe.com"
+port = 3306
+user = "user"
+password = "secret"
+database = "data"
+queryinterval = 5000
+connectTimeout = 30000
+acquireTimeout = 30000
+
+[ssl]
+key = "/path/to/ssl/key"
+cert = "/path/to/ssl/cert"
+ca = "/path/to/ssl/ca"
+
+[nslm]
+baseURL = "https://xxx.example.com:9911/"
+accessKey = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+secretKey = "YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY"
+
+[aws]
+ec2_max_tries = 60
+ec2_timeout = 10000
+
+[aws.ec2]
+accessKeyId = "00000000000000000000000000000000"
+secretAccessKey = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+accountId = "XXXXXXXXXXXX"
+region = ""
+keyName = "worker-key"
+securityGroup = "master"
+
+[aws.ec2.endpoint]
+protocol = "http"
+host = "ec2.example.com"
+port = 8773
+path = "services/Cloud"
+signatureVersion = "v2"
+
+[aws.s3]
+accessKeyId = "WWWWWWWWWWWWWWWWWWWW"
+secretAccessKey = "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0"
+accountId = "XXXXXXXXXXXX"
+bucket = "clients-bucket"
+vendorBucket = "vendor-bucket"
+region = ""
+serverSideEncryption = false
+s3ForcePathStyle = true
+expiresInMinutes = 5
+uploadMethod = "post"
+
+[aws.s3.endpoint]
+protocol = "https"
+host = "s3.example.com"
+port = 443
+path = "/"

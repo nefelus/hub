@@ -12,7 +12,7 @@ var hubServer = null;
 program
   .version('0.0.1')
   .usage('<command> [options]')
-  .option('-c, --config <path>', 'set config path. defaults to ./config.json', path.join(__dirname, 'config.json'))
+  .option('-c, --config <path>', 'set config dir path.')
   .option('-H, --hub-server <url>', 'set hub location')
   .option('-A, --api-key <key>', 'set the API key')
   .option('-S, --api-secret <secret>', 'set the API secret')
@@ -119,11 +119,77 @@ function callHub(program, cmd, options) {
       break;
   }
 }
+
 function hubSetup(program) {
-  nconf.env().file({ file: program.config });
+  var isJX = (path.basename(process.argv[0]) === 'jx');
+  var isPkg = (process.versions.pkg !== undefined);
+
+  var exepath;
+
+  if (isPkg) {
+    exepath = process.argv[0];
+  } else if ((path.basename(process.argv[0]) === 'node') || (isJX)) {
+    exepath = process.argv[1];
+  } else {
+    exepath = process.argv[0];
+  }
+  exepath = path.dirname(exepath);
+
+  var commonConfigDir = program.config || '/usr/share/nefelus/conf';
+  var appConfigDir = commonConfigDir;
+
+  if (nt.isReadableSync(path.join(commonConfigDir, 'nefelus.conf')) === false) {
+    logger.log(path.join(commonConfigDir, 'nefelus.conf')+' not found. Falling back to '+ path.join(exepath, 'nefelus.conf'));
+    commonConfigDir = exepath;
+    if (nt.isReadableSync(path.join(commonConfigDir, 'nefelus.conf')) === false) {
+      logger.log(path.join(commonConfigDir, 'nefelus.conf')+' not found. Exiting.');
+      process.exit(2);
+    }
+  }
+
+  if (nt.isReadableSync(path.join(appConfigDir, 'hub.conf')) === false) {
+    logger.log(path.join(appConfigDir, 'hub.conf')+' not found. Falling back to '+ path.join(exepath, 'hub.conf'));
+    appConfigDir = exepath;
+    if (nt.isReadableSync(path.join(appConfigDir, 'hub.conf')) === false) {
+      logger.log(path.join(appConfigDir, 'hub.conf')+' not found. Exiting.');
+      process.exit(2);
+    }
+  }
+
+  var commonConfigData = fs.readFileSync(path.join(commonConfigDir, 'nefelus.conf'), 'utf-8');
+  var appConfigData = fs.readFileSync(path.join(appConfigDir, 'hub.conf'), 'utf-8');
+  var commonConfig;
+  var appConfig;
+  try {
+    commonConfig = toml.parse(commonConfigData);
+  } catch (e) {
+    logger.log('Error parsing '+ path.join(commonConfigDir, 'nefelus.conf'));
+    logger.log(util.inspect(e, {depth:null}));
+  }
+  try {
+    appConfig = toml.parse(appConfigData);
+  } catch (e) {
+    logger.log('Error parsing '+ path.join(appConfigDir, 'hub.conf'));
+    logger.log(util.inspect(e, {depth:null}));
+  }
+
+  nconf.env()
+       .add('hub', {type: 'literal', store: appConfig})
+       .add('nefelus', {type: 'literal', store: commonConfig})
+       .defaults({
+         port : 8585,
+         host : 'localhost',
+         ssl : false,
+         ignoreInstallationIdInFilemanagerOps : false,
+         hasAutoAssignFloatingIp : true
+       });
+
   var hubPort = nconf.get('hub:port') || 8585;
   var hubHost = nconf.get('hub:host') || '127.0.0.1';
-  var ssl = nconf.get('hub:ssl') || false;
+  var ssl = nconf.get('ssl') || false;
+  if (nt.isEmpty(ssl)) {
+    ssl = false;
+  }
   var hubProtocol = 'http';
   if (ssl !== false) {
     if ((ssl.key !== '') && (nt.isReadableSync(ssl.key)) && (ssl.cert !== '') && (nt.isReadableSync(ssl.cert))) {
