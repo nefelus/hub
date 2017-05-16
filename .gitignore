@@ -9,6 +9,8 @@ tests
 tools
 configs
 config.json
+nefelus.conf
+hub.conf
 var
 
 lib-cov

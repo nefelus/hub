@@ -8,7 +8,7 @@ program
   .command('com','desc for com')
   //.command('fs','desc for fs')
   .command('hub','desc for com')
-  .option('-c, --config <path>', 'set config path. defaults to ./config.json', path.join(__dirname, 'config.json'))
+  .option('-c, --config <path>', 'set config dir path.')
   .option('-H, --hub-server <url>', 'set hub location')
   .option('-A, --api-key <key>', 'set the API key')
   .option('-S, --api-secret <secret>', 'set the API secret')

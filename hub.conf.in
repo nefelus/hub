@@ -1,0 +1,112 @@
+#
+# Nefelus HUB config
+#
+# This file is in TOML format (https://github.com/toml-lang/toml)
+
+# hubType : default value is "production" and is passed to VM via userdata.
+# If set to "ami" then the machine is supposed to be used for VM image creation.
+hubType = "production"
+
+host = "hub.example.com"
+port = 8585
+
+maxRunningJobsAllowed = 10
+
+skipCycles = 8
+cancelHours = 0
+forceCancelHours = 0
+
+setloginuser = true
+setsecgroups = false
+vncLocalOnly = false
+
+masterScripts = false
+
+[aws]
+dnsPostprocess = "dnstransform"
+
+[aws.dnstransform]
+matches =  [ "/[.]/g", "/^/", "/$/" ]
+values = [ "-", "worker-", "." ]
+domainName = "cdc-lab.com"
+
+[aws.route53]
+
+# database config is normally set in nefelus.conf
+# values here overide default ones.
+[database]
+queryinterval = 15000
+
+[staticUserData]
+TIMEZONE = "UTC"
+MAKESWAPFILE = "NO"
+STUNNEL = "YES"
+"LOGO_BIG.png" = "https://www.example.com/nefelus.png"
+"LOGO_SMALL.png" = "https://www.example.com/nefelus_small.png"
+"LOGO_NEFELUS_BIG.png" = "https://www.example.com/nefelus.png"
+"LOGO_NEFELUS_SMALL.png" = "https://www.example.com/nefelus_small.png"
+
+[vm]
+username = "nefelus"
+masterDebug = true
+heartbeatInterval = 60000
+x11IdleTimeout = 0
+homeBlacklistPatterns = [ "!/home/nefelus/.Xauthority"
+                               , "!/home/nefelus/.bashrc*"
+                               , "!/home/nefelus/.twmrc"
+                               , "!/home/nefelus/.profile"
+                               , "!/home/nefelus/.cshrc"
+                               , "!/home/nefelus/.tcshrc"
+                               , "!/home/nefelus/.vnc/*"
+                               , "!/home/nefelus/.ssh/*"
+                               , "!/home/nefelus/tool/**"
+                               , "!/home/nefelus/**/*.lock"
+                               , "!/home/nefelus/.npm/*"
+                               , "!/home/nefelus/.jx/*"
+                               , "!/home/nefelus/.node-gyp/*"
+                               , "!/home/nefelus/.fontconfig/*"
+                               , "!/mnt/nefelus/.Xauthority"
+                               , "!/mnt/nefelus/.bashrc*"
+                               , "!/mnt/nefelus/.twmrc"
+                               , "!/mnt/nefelus/.profile"
+                               , "!/mnt/nefelus/.cshrc"
+                               , "!/mnt/nefelus/.tcshrc"
+                               , "!/mnt/nefelus/.vnc/*"
+                               , "!/mnt/nefelus/.ssh/*"
+                               , "!/mnt/nefelus/tool/**"
+                               , "!/mnt/nefelus/.npm/*"
+                               , "!/mnt/nefelus/.jx/*"
+                               , "!/mnt/nefelus/.node-gyp/*"
+                               , "!/mnt/nefelus/**/*.lock"
+                               , "!/mnt/nefelus/.fontconfig/*"
+                               ]
+
+# Definitions for VM Dashboard and log viewer access
+[vm.logURL]
+port = 8998
+protocol = "https"
+
+# Definitions for VNC console access
+[vm.vncURL]
+port = "8997"
+protocol = "https"
+debug = false
+
+# Definitions for prompt console access
+[vm.cmdURL]
+port = "8996"
+protocol = "https"
+
+[[emailTemplates]]
+name="session-status"
+source = "session-status.html"
+subject = "Status report for session {{ID}}"
+[emailTemplates.context]
+firstname = ""
+ID = ""
+toolname = ""
+blockname = ""
+projectname = ""
+started = ""
+completed = ""
+status = ""

@@ -35,6 +35,7 @@ var mysql      = require('mysql');
 var SQL        = require('./sqlTemplates').sqlTemplates;
 var crypto     = require('crypto');
 var nconf      = require('nconf');
+var toml      = require('toml');
 var nt         = require('./lib/tools');
 var http       = require('http');
 var https      = require('https');
@@ -64,15 +65,52 @@ var machines = require('./lib/machines');
 var _nslm = require('./lib/nslmlib');
 
 var isJX = (path.basename(process.argv[0]) === 'jx');
-var myargs = ((path.basename(process.argv[0]) === 'node') ||
-              (path.basename(process.argv[0]) === 'jx')) ?
-             process.argv.slice(2) : process.argv.slice(1);
+var isPkg = (process.versions.pkg !== undefined);
+
+var exepath;
+var myargs;
+
+if (isPkg) {
+  exepath = process.argv[0];
+  myargs = process.argv.slice(2);
+} else if ((path.basename(process.argv[0]) === 'node') || (isJX)) {
+  exepath = process.argv[1];
+  myargs = process.argv.slice(2);
+} else {
+  exepath = process.argv[0];
+  myargs = process.argv.slice(1);
+}
+exepath = path.dirname(exepath);
+
+var mainconf = new nconf.Provider();
+mainconf.argv({ c: { alias: 'config'}, V : {alias: 'version'} });
+
+var commonConfigDir = mainconf.get('config') || '/usr/share/nefelus/conf';
+var appConfigDir = commonConfigDir;
+
+if (nt.isReadableSync(path.join(commonConfigDir, 'nefelus.conf')) === false) {
+  logger.log(path.join(commonConfigDir, 'nefelus.conf')+' not found. Falling back to '+ path.join(exepath, 'nefelus.conf'));
+  commonConfigDir = exepath;
+  if (nt.isReadableSync(path.join(commonConfigDir, 'nefelus.conf')) === false) {
+    logger.log(path.join(commonConfigDir, 'nefelus.conf')+' not found. Exiting.');
+    process.exit(2);
+  }
+}
+
+if (nt.isReadableSync(path.join(appConfigDir, 'hub.conf')) === false) {
+  logger.log(path.join(appConfigDir, 'hub.conf')+' not found. Falling back to '+ path.join(exepath, 'hub.conf'));
+  appConfigDir = exepath;
+  if (nt.isReadableSync(path.join(appConfigDir, 'hub.conf')) === false) {
+    logger.log(path.join(appConfigDir, 'hub.conf')+' not found. Exiting.');
+    process.exit(2);
+  }
+}
 
 logger.log('--------------------------------------------------');
 logger.log('-             Nefelus HUB ' + HUBversion + '                 -');
 logger.log('--------------------------------------------------');
 
-if ((myargs[0] === '-V') || (myargs[0] === '--version')) {
+if (mainconf.get('version')) {
   process.exit(0);
 }
 
@@ -96,19 +134,10 @@ var SKIP_CYCLES = 4;
 
 tmp.setGracefulCleanup();
 
-configFilename = __dirname + '/config.json';
-
-logger.log('Config file : ' + configFilename);
-if (! nt.isReadableSync(configFilename)) {
-  logger.log('Configuration file '+configFilename+' not accessible. Exiting...');
-  process.exit();
-}
-
 var HEALTH_CHECK_INTERVAL = 30000; // 30 secs
 var CONSOLE_CHECK_INTERVAL = 5000; // 5 secs
 var CONSOLE_CHECK_MAX_TIMES = 60;  // 60 times * 5 secs = 5 minutes
 var env = process.env;
-var mainconf = new nconf.Provider();
 
 var sslOptions = false;
 var sslMasterPack = false;
@@ -130,7 +159,6 @@ var workerUsername;
 var setloginuser;
 var setsecgroups;
 var hasAutoAssignFloatingIp;
-var noVNCdebug;
 
 var hubType;
 var hubPort;
@@ -140,13 +168,13 @@ var hubProtocol;
 var timezone = null;
 var vncLocalOnly;
 var staticUserData;
-var xtermSupport;
 var logURLproto;
 var vncURLproto;
 var cmdURLproto;
 var logURLport;
 var vncURLport;
 var cmdURLport;
+var noVNCdebug;
 var x11IdleTimeout;
 var homeBlacklistPatterns = [];
 var emailTemplates;
@@ -210,7 +238,7 @@ process.on('SIGINT', sigintHandler);
 process.on('SIGTERM', sigintHandler);
 
 process.on('SIGHUP', function () {
-  logger.log('Got SIGHUP, reloading config file:' + configFilename);
+  logger.log('Got SIGHUP, reloading configs...');
   loadConfig();
 });
 
@@ -248,23 +276,43 @@ var sessionStatusCodes = [
 // -----------------------------------------------------------------------------
 
 function loadConfig() {
-  mainconf.argv()
-          .env()
-          .file({file: configFilename})
+
+  logger.log('Loading configs : '+path.join(commonConfigDir, 'nefelus.conf')+', '+path.join(appConfigDir, 'hub.conf'));
+  var commonConfigData = fs.readFileSync(path.join(commonConfigDir, 'nefelus.conf'), 'utf-8');
+  var appConfigData = fs.readFileSync(path.join(appConfigDir, 'hub.conf'), 'utf-8');
+  var commonConfig;
+  var appConfig;
+  try {
+    commonConfig = toml.parse(commonConfigData);
+  } catch (e) {
+    logger.log('Error parsing '+ path.join(commonConfigDir, 'nefelus.conf'));
+    logger.log(util.inspect(e, {depth:null}));
+  }
+  try {
+    appConfig = toml.parse(appConfigData);
+  } catch (e) {
+    logger.log('Error parsing '+ path.join(appConfigDir, 'hub.conf'));
+    logger.log(util.inspect(e, {depth:null}));
+  }
+
+  mainconf.env()
+          .add('hub', {type: 'literal', store: appConfig})
+          .add('nefelus', {type: 'literal', store: commonConfig})
           .defaults({
-            hub : {
-              port : 8585,
-              host : 'localhost',
-              ssl : false
-            },
+            port : 8585,
+            host : 'localhost',
+            ssl : false,
             ignoreInstallationIdInFilemanagerOps : false,
             hasAutoAssignFloatingIp : true
           });
 
   timezone = mainconf.get('timezone') || null;
-  hubPort = mainconf.get('hub:port');
-  hubHost = mainconf.get('hub:host');
-  var ssl = mainconf.get('hub:ssl');
+  hubPort = mainconf.get('port');
+  hubHost = mainconf.get('host');
+  var ssl = mainconf.get('ssl');
+  if (nt.isEmpty(ssl)) {
+    ssl = false;
+  }
   hubProtocol = 'http';
   if (ssl !== false) {
     var sslKey = '';
@@ -387,10 +435,10 @@ function loadConfig() {
   AWS.config.update(awsParams);
 
   EC2Params = {};
-  if (aws && aws.ec2 && aws.ec2.endPoint &&  (! nt.isEmpty(aws.ec2.endPoint))) {
+  if (aws && aws.ec2 && aws.ec2.endpoint &&  (! nt.isEmpty(aws.ec2.endpoint))) {
     //'endpoint' : {'protocol' : 'http', 'host' : 'nefelus-master-radosgw.acmac.uoc.gr', 'port' : 80, 'path' : '/'}
     var endpoint;
-    var _ep = aws.ec2.endPoint.endpoint;
+    var _ep = aws.ec2.endpoint;
     if (typeof _ep === 'string') {
       endpoint = _ep;
     } else {
@@ -405,7 +453,7 @@ function loadConfig() {
       EC2Params['endpoint'] =  ep;
     }
 
-    var signver = aws.ec2.endPoint.signatureVersion || null;
+    var signver = aws.ec2.endpoint.signatureVersion || aws.ec2.signatureVersion || null;
     if (signver !== null) {
       EC2Params['signatureVersion'] = signver;
     }
@@ -416,7 +464,7 @@ function loadConfig() {
   EC2_TIMEOUT = mainconf.get('aws:ec2_timeout') || 10000;
   EC2_MAX_TRIES = mainconf.get('aws:ec2_max_tries') || 60;
 
-  masterScripts = mainconf.get('nefelus:masterScripts') || false;
+  masterScripts = mainconf.get('masterScripts') || false;
   if (masterScripts && (masterScripts !== '') && (nt.isReadableSync(masterScripts))) {
     masterScripts = fs.readFileSync(masterScripts);
   } else {
@@ -430,24 +478,23 @@ function loadConfig() {
   }
   vncLocalOnly = nt.isTrue(mainconf.get('vncLocalOnly'));
   staticUserData = mainconf.get('staticUserData') || {};
-  xtermSupport = mainconf.get('xterm') || 'NO';
   keyName = mainconf.get('aws:ec2:keyName') || null;
   securityGroup = mainconf.get('aws:ec2:securityGroup') || 'default';
   setloginuser = mainconf.get('setloginuser') || false;
   setsecgroups = mainconf.get('setsecgroups') || false;
   hasAutoAssignFloatingIp = mainconf.get('hasAutoAssignFloatingIp');
-  noVNCdebug = mainconf.get('noVNCdebug') || false;
-  workerUsername = mainconf.get('nefelus:username');
-  logURLproto = mainconf.get('nefelus:logURL:protocol');
-  vncURLproto = mainconf.get('nefelus:vncURL:protocol');
-  cmdURLproto = mainconf.get('nefelus:cmdURL:protocol');
-  logURLport = mainconf.get('nefelus:logURL:port');
-  vncURLport = mainconf.get('nefelus:vncURL:port');
-  cmdURLport = mainconf.get('nefelus:cmdURL:port');
-  x11IdleTimeout = mainconf.get('nefelus:x11IdleTimeout');
-  homeBlacklistPatterns = mainconf.get('nefelus:homeBlacklistPatterns') || [];
-  cancelHours = mainconf.get('hub:cancelHours') || 0;
-  forceCancelHours = mainconf.get('hub:forceCancelHours') || ((cancelHours === 0) ? 0 : cancelHours + 2);
+  workerUsername = mainconf.get('vm:username');
+  logURLproto = mainconf.get('vm:logURL:protocol');
+  vncURLproto = mainconf.get('vm:vncURL:protocol');
+  cmdURLproto = mainconf.get('vm:cmdURL:protocol');
+  logURLport = mainconf.get('vm:logURL:port');
+  vncURLport = mainconf.get('vm:vncURL:port');
+  cmdURLport = mainconf.get('vm:cmdURL:port');
+  noVNCdebug = mainconf.get('vm:vncURL:debug') || false;
+  x11IdleTimeout = mainconf.get('vm:x11IdleTimeout');
+  homeBlacklistPatterns = mainconf.get('vm:homeBlacklistPatterns') || [];
+  cancelHours = mainconf.get('cancelHours') || 0;
+  forceCancelHours = mainconf.get('forceCancelHours') || ((cancelHours === 0) ? 0 : cancelHours + 2);
   if (cancelHours !== 0) {
     if (cancelHoursTimer == null) {
       cancelHoursTimer = setInterval(function() {
@@ -461,8 +508,8 @@ function loadConfig() {
     }
   }
   adminEmail = mainconf.get('adminEmail');
-  masterDebug = mainconf.get('nefelus:masterDebug') || false;
-  MAX_RUNNING_JOBS_ALLOWED = mainconf.get('hub:maxRunningJobsAllowed') || 0;
+  masterDebug = mainconf.get('vm:masterDebug') || false;
+  MAX_RUNNING_JOBS_ALLOWED = mainconf.get('maxRunningJobsAllowed') || 0;
   MAX_RUNNING_JOBS_ALLOWED = Number(MAX_RUNNING_JOBS_ALLOWED);
   db = mainconf.get('database');
   hubType = mainconf.get('hubType') || 'production';
@@ -475,7 +522,7 @@ function loadConfig() {
     'acquireTimeout'  : db.acquireTimeout || 30000,
     'timezone' : 'Z'
   };
-  SKIP_CYCLES = mainconf.get('hub:skipCycles') || 4;
+  SKIP_CYCLES = mainconf.get('skipCycles') || 4;
   setupMySQL(mysqlConfig);
   emailTemplates = mainconf.get('emailTemplates') || [];
   MySQLParamsLoaded = false; // Quotas are loaded in main SQL loop.
