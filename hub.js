@@ -3390,7 +3390,15 @@ function handleHello(socket, instanceId, ticket, msg) {
     Tickets[ticket].setMaster('socket', socket.id);
     var uuid = Tickets[ticket].get('uuid');
     var cipher = crypto.createCipher('aes256', instanceId);
-    var encrypted = cipher.update(JSON.stringify(aws), 'utf8', 'hex') +
+    var aws2master = {
+                      ec2_max_tries : EC2_MAX_TRIES,
+                      ec2_timeout : EC2_TIMEOUT,
+                      s3 : aws.s3
+                     }
+    aws2master.s3.endPoint = {};
+    aws2master.s3.endPoint.endpoint = aws.s3.endpoint;
+
+    var encrypted = cipher.update(JSON.stringify(aws2master), 'utf8', 'hex') +
                     cipher.final('hex');
     Tickets[ticket].set('sessionStatus', 'initialize');
     var runas = Tickets[ticket].getRequest('runas');
