@@ -40,6 +40,7 @@ accessKeyId = "00000000000000000000000000000000"
 secretAccessKey = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 accountId = "XXXXXXXXXXXX"
 region = ""
+zone = ""
 keyName = "worker-key"
 securityGroup = "master"
 
