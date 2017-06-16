@@ -1,7 +1,9 @@
 var program = require('commander');
+var fs = require('fs');
 var path = require('path');
 var util = require('util');
 var async = require('async');
+var toml = require('toml');
 var nconf = require('nconf');
 var AWS = require('aws-sdk');
 var _ = require('lodash');
@@ -354,19 +356,19 @@ function awsSetup(program) {
   var appConfigDir = commonConfigDir;
 
   if (nt.isReadableSync(path.join(commonConfigDir, 'nefelus.conf')) === false) {
-    logger.log(path.join(commonConfigDir, 'nefelus.conf')+' not found. Falling back to '+ path.join(exepath, 'nefelus.conf'));
+    console.log(path.join(commonConfigDir, 'nefelus.conf')+' not found. Falling back to '+ path.join(exepath, 'nefelus.conf'));
     commonConfigDir = exepath;
     if (nt.isReadableSync(path.join(commonConfigDir, 'nefelus.conf')) === false) {
-      logger.log(path.join(commonConfigDir, 'nefelus.conf')+' not found. Exiting.');
+      console.log(path.join(commonConfigDir, 'nefelus.conf')+' not found. Exiting.');
       process.exit(2);
     }
   }
 
   if (nt.isReadableSync(path.join(appConfigDir, 'hub.conf')) === false) {
-    logger.log(path.join(appConfigDir, 'hub.conf')+' not found. Falling back to '+ path.join(exepath, 'hub.conf'));
+    console.log(path.join(appConfigDir, 'hub.conf')+' not found. Falling back to '+ path.join(exepath, 'hub.conf'));
     appConfigDir = exepath;
     if (nt.isReadableSync(path.join(appConfigDir, 'hub.conf')) === false) {
-      logger.log(path.join(appConfigDir, 'hub.conf')+' not found. Exiting.');
+      console.log(path.join(appConfigDir, 'hub.conf')+' not found. Exiting.');
       process.exit(2);
     }
   }
@@ -379,14 +381,14 @@ function awsSetup(program) {
   try {
     commonConfig = toml.parse(commonConfigData);
   } catch (e) {
-    logger.log('Error parsing '+ path.join(commonConfigDir, 'nefelus.conf'));
-    logger.log(util.inspect(e, {depth:null}));
+    console.log('Error parsing '+ path.join(commonConfigDir, 'nefelus.conf'));
+    console.log(util.inspect(e, {depth:null}));
   }
   try {
     appConfig = toml.parse(appConfigData);
   } catch (e) {
-    logger.log('Error parsing '+ path.join(appConfigDir, 'hub.conf'));
-    logger.log(util.inspect(e, {depth:null}));
+    console.log('Error parsing '+ path.join(appConfigDir, 'hub.conf'));
+    console.log(util.inspect(e, {depth:null}));
   }
 
   nconf.env()
