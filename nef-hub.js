@@ -1,5 +1,7 @@
 var program = require('commander');
 var path = require('path');
+var fs = require('fs');
+var toml = require('toml');
 var nconf = require('nconf');
 var io = require('socket.io-client');
 var _ = require('lodash');
@@ -139,19 +141,19 @@ function hubSetup(program) {
   var appConfigDir = commonConfigDir;
 
   if (nt.isReadableSync(path.join(commonConfigDir, 'nefelus.conf')) === false) {
-    logger.log(path.join(commonConfigDir, 'nefelus.conf')+' not found. Falling back to '+ path.join(exepath, 'nefelus.conf'));
+    console.log(path.join(commonConfigDir, 'nefelus.conf')+' not found. Falling back to '+ path.join(exepath, 'nefelus.conf'));
     commonConfigDir = exepath;
     if (nt.isReadableSync(path.join(commonConfigDir, 'nefelus.conf')) === false) {
-      logger.log(path.join(commonConfigDir, 'nefelus.conf')+' not found. Exiting.');
+      console.log(path.join(commonConfigDir, 'nefelus.conf')+' not found. Exiting.');
       process.exit(2);
     }
   }
 
   if (nt.isReadableSync(path.join(appConfigDir, 'hub.conf')) === false) {
-    logger.log(path.join(appConfigDir, 'hub.conf')+' not found. Falling back to '+ path.join(exepath, 'hub.conf'));
+    console.log(path.join(appConfigDir, 'hub.conf')+' not found. Falling back to '+ path.join(exepath, 'hub.conf'));
     appConfigDir = exepath;
     if (nt.isReadableSync(path.join(appConfigDir, 'hub.conf')) === false) {
-      logger.log(path.join(appConfigDir, 'hub.conf')+' not found. Exiting.');
+      console.log(path.join(appConfigDir, 'hub.conf')+' not found. Exiting.');
       process.exit(2);
     }
   }
@@ -163,14 +165,14 @@ function hubSetup(program) {
   try {
     commonConfig = toml.parse(commonConfigData);
   } catch (e) {
-    logger.log('Error parsing '+ path.join(commonConfigDir, 'nefelus.conf'));
-    logger.log(util.inspect(e, {depth:null}));
+    console.log('Error parsing '+ path.join(commonConfigDir, 'nefelus.conf'));
+    console.log(util.inspect(e, {depth:null}));
   }
   try {
     appConfig = toml.parse(appConfigData);
   } catch (e) {
-    logger.log('Error parsing '+ path.join(appConfigDir, 'hub.conf'));
-    logger.log(util.inspect(e, {depth:null}));
+    console.log('Error parsing '+ path.join(appConfigDir, 'hub.conf'));
+    console.log(util.inspect(e, {depth:null}));
   }
 
   nconf.env()
@@ -200,7 +202,7 @@ function hubSetup(program) {
 }
 
 function _callHub(cmd, options) {
-  //logger.log('Connecting to '+hubServer);
+  //console.log('Connecting to '+hubServer);
   var hubOptions = {
       reconnection: true,
       reconnectionDelay:1000,
@@ -212,7 +214,7 @@ function _callHub(cmd, options) {
   } catch(e) {};
 
   var errorHandler = function errorHandler(error) {
-    logger.log('Received an error : '+util.inspect(error, {depth:null}) || 'no further info provided.');
+    console.log('Received an error : '+util.inspect(error, {depth:null}) || 'no further info provided.');
   }
 
   if (socket) {
