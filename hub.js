@@ -34,8 +34,9 @@ var path       = require('path');
 var mysql      = require('mysql');
 var SQL        = require('./sqlTemplates').sqlTemplates;
 var crypto     = require('crypto');
+var zlib       = require('zlib');
 var nconf      = require('nconf');
-var toml      = require('toml');
+var toml       = require('toml');
 var nt         = require('./lib/tools');
 var http       = require('http');
 var https      = require('https');
@@ -1262,82 +1263,117 @@ function startMaster(ticket, cb) {
                 cb('ERROR, AMI not set.', null);
                 return;
               }
-              var _enckey = ticket.req.ami + ticket.req.machineSpeed + ticket.req.sessionId + '\n';
-              var md5sum = crypto.createHash('md5');
-              var enckey = md5sum.update(_enckey).digest('hex');
 
-              nt.cryptData(masterScripts, enckey, function(mserr, msdata) {
+              //var _enckey = ticket.req.ami + ticket.req.machineSpeed + ticket.req.sessionId + '\n';
+              //var md5sum = crypto.createHash('md5');
+              //var enckey = md5sum.update(_enckey).digest('hex');
+
+              var denckey = nt.mkKey('sha256', [ ticket.req.ami, ticket.req.machineSpeed, ticket.req.sessionId]);
+              var enckey = nt.mkKey('sha256', [ ticket.req.ami, ticket.req.machineSpeed]);
+
+              nt.cryptData(masterScripts, denckey, function(mserr, msdata) {
                 if (! mserr) {
                   userData['masterscripts'] = msdata;
                 }
 
-                nt.cryptData(sslMasterPack, enckey, function(err, data) {
-                  if (! err) {
-                    userData['crt'] = data;
+                nt.cryptData(sslMasterPack, denckey, function(sslmperr, sslmpdata) {
+                  if (! sslmperr) {
+                    userData['crt'] = sslmpdata;
                   }
 
-                  startMachines(ticket.req.ami, 1, ticket.req.machineId, ticket.req.sessionId, userData, function(err, data) {
+                  //TODO : replace old style userdata format with json. Needs changes in VM and master.js
+                  //var _userDataStr = JSON.stringify(userData);
+                  var _userDataStr = '';
+                  var k;
+                  for (k in userData) {
+                    _userDataStr = _userDataStr + '#%' + k + ':' + userData[k] + '\n';
+                  }
+
+                  nt.cryptData(_userDataStr, enckey, function (err, encdata) {
+                    var header;
+                    var zdata;
+                    header = '#NFUDPP2#';
                     if (err) {
-                      logger.log('Failed to start instance for ' + ticket.req.sessionId);
-                      cb(err, null);
+                      zdata = userDataStr;
+                      header = '#NFUDP';
                     } else {
-/*
-                      if (data) {
-                        getMachinesInfo(data, function(err, data) {
-                          if (err) {
-                            logger.log('Failed to get machine info for ' + ticket.req.sessionId);
-                            cb(err, null);
-                          } else {
-                            ticket.machineStarted = new Date();
-                            cb(null, data);
-                          }
-                        });
+                      zdata = encdata;
+                      header = '#NFUDE';
+                    }
+                    zlib.gzip(zdata, function (zerr, buf) {
+                      var userDataStr;
+                      if (! zerr) {
+                        header += 'Z2#';
+                        userDataStr = header+buf.toString('base64');
                       } else {
-                        cb(null, null);
+                        header += 'P2#';
+                        userDataStr = header+zdata;
                       }
-*/
-                      if (data) {
 
-                        async.each(data, function(item, callback) {
-
-                          associateNextFreeAddress(item, hasAutoAssignFloatingIp, function(err, resp) {
-                            if (err === null) {
-                              logger.log(ticket.req.sessionId + ': IP '+resp.address+' associated to '+resp.instance);
-                              callback();
-                            } else {
-                              logger.log(ticket.req.sessionId + ': Error while associating IP address to : '+resp.instance+' : '+util.inspect(err, {depth:null}));
-                              callback(err);
-                            }
-                          });
-
-                        },
-                        function (err) {
-                          if (err) {
-                            // One of the associations produced an error. Kill machines and let system retry later.
-                            KillMachines(data, function (err, killedMachines) {
-                              if (err) {
-                                logger.log(ticket.req.sessionId + ': Failed to terminate instance ' + data.join());
-                              } else {
-                                logger.log(ticket.req.sessionId + ': Machines ' + data.join() + ' terminated');
-                              }
-                              cb(null, null); // This will cause to retry session later due to limited resources
-                            });
-                          } else {
-                            getMachinesInfo(data, function(err, machineinfo) {
+                      startMachines(ticket.req.ami, 1, ticket.req.machineId, ticket.req.sessionId, userDataStr, function(err, data) {
+                        if (err) {
+                          logger.log('Failed to start instance for ' + ticket.req.sessionId);
+                          cb(err, null);
+                        } else {
+/*
+                          if (data) {
+                            getMachinesInfo(data, function(err, data) {
                               if (err) {
                                 logger.log('Failed to get machine info for ' + ticket.req.sessionId);
-                                cb(err, null); // FIXME: check err, data value
+                                cb(err, null);
                               } else {
                                 ticket.machineStarted = new Date();
-                                cb(null, machineinfo);
+                                cb(null, data);
                               }
                             });
+                          } else {
+                            cb(null, null);
                           }
-                        });
-                      } else {
-                        cb(null, null);
-                      }
-                    }
+*/
+                          if (data) {
+
+                            async.each(data, function(item, callback) {
+
+                              associateNextFreeAddress(item, hasAutoAssignFloatingIp, function(err, resp) {
+                                if (err === null) {
+                                  logger.log(ticket.req.sessionId + ': IP '+resp.address+' associated to '+resp.instance);
+                                  callback();
+                                } else {
+                                  logger.log(ticket.req.sessionId + ': Error while associating IP address to : '+resp.instance+' : '+util.inspect(err, {depth:null}));
+                                  callback(err);
+                                }
+                              });
+
+                            },
+                            function (err) {
+                              if (err) {
+                                // One of the associations produced an error. Kill machines and let system retry later.
+                                KillMachines(data, function (err, killedMachines) {
+                                  if (err) {
+                                    logger.log(ticket.req.sessionId + ': Failed to terminate instance ' + data.join());
+                                  } else {
+                                    logger.log(ticket.req.sessionId + ': Machines ' + data.join() + ' terminated');
+                                  }
+                                  cb(null, null); // This will cause to retry session later due to limited resources
+                                });
+                              } else {
+                                getMachinesInfo(data, function(err, machineinfo) {
+                                  if (err) {
+                                    logger.log('Failed to get machine info for ' + ticket.req.sessionId);
+                                    cb(err, null); // FIXME: check err, data value
+                                  } else {
+                                    ticket.machineStarted = new Date();
+                                    cb(null, machineinfo);
+                                  }
+                                });
+                              }
+                            });
+                          } else {
+                            cb(null, null);
+                          }
+                        }
+                      });
+                    });
                   });
                 });
               });
@@ -1356,26 +1392,20 @@ function startMaster(ticket, cb) {
 
 function startMachines(image, count, machineId, sessionId, userData, cb) {
   var k;
-  var ud = '';
-  for (k in userData) {
-    ud = ud + '#%' + k + ':' + userData[k] + '\n';
-  }
-
   var udb;
 
   if (typeof Buffer.from === 'function') {
     try {
       // Node 4.4.* Buffer.from already exists, but throws error
-      udb = Buffer.from(ud);
+      udb = Buffer.from(userData);
     } catch (_error) {
-      udb = new Buffer(ud);
+      udb = new Buffer(userData);
     }
   } else {
-    udb = new Buffer(ud);
+    udb = new Buffer(userData);
   }
-  ud = udb.toString('base64');
-  var speed = machines.getSpeed(machineId);
 
+  var speed = machines.getSpeed(machineId);
   var noOfEphemeralVols = machines.getEphemeral(machineId) || 0;
   var blockDeviceMappings = [];
 
@@ -1394,7 +1424,7 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
     ImageId        : image,
     MinCount       : count,
     MaxCount       : count,
-    UserData       : ud,
+    UserData       : udb.toString('base64'),
     SecurityGroups : [securityGroup],
     InstanceType   : speed
   };
