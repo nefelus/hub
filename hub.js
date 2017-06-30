@@ -1247,12 +1247,35 @@ function startMaster(ticket, cb) {
 
               userData['totalshares'] = allShares.length;
               allShares.forEach(function(n, i) {
+                var fstype = '@';
+                var fsExtraParams = '';
+                var creds;
                 if ((n.fstype !== '') && (n.location !== '') && (n.mountPoint !== '')) {
                   //'fstype':'nfs','location':'10.0.0.2:/tools/icscape','mountParams':null,'mountPoint':'/tools/icscape'
                   logger.log(ticket.req.sessionId+': share = '+ n.location + ' ' + n.mountPoint + (((n.mountParams!==null) && (n.mountParams!=='')) ? (' ' + n.mountParams) : ''));
-                  userData['h' + n.fstype + i] = n.location;
-                  userData['c' + n.fstype + i] = n.mountPoint;
-                  userData['p' + n.fstype + i] = (((n.mountParams!==null) && (n.mountParams!=='')) ? (n.mountParams) : 'ro');
+
+                  if (n.fstype === 'nfs') {
+                    fstype = 'n';
+                    fsExtraParams = mainconf.get('vm:shares:nfsMountParams') || '';
+                  } else if (n.fstype === 'cifs') {
+                    fstype = 'c';
+                    fsExtraParams = mainconf.get('vm:shares:cifsMountParams') || '';
+                    creds = n.creds.split('/');
+                    if (fsExtraParams !== '') {
+                      fsExtraParams += ',';
+                    }
+                    if ((! n.mountParams) || (n.mountParams === '') || (n.mountParams.match(/(^|[,])(ro)($|[,])/) !== null)) {
+                      fsExtraParams += 'username='+creds[3]+',password='+creds[4];
+                    } else {
+                      fsExtraParams += 'username='+creds[1]+',password='+creds[2];
+                    }
+                  }
+                  if (fsExtraParams !== '') {
+                    fsExtraParams = ','+fsExtraParams;
+                  }
+                  userData['h' + fstype + 'fs' + i] = n.location;
+                  userData['c' + fstype + 'fs' + i] = n.mountPoint;
+                  userData['p' + fstype + 'fs' + i] = (((n.mountParams!==null) && (n.mountParams!=='')) ? (n.mountParams) : 'ro')+fsExtraParams;
                 }
               });
 

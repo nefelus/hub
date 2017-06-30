@@ -111,6 +111,10 @@ debug = false
 port = "8996"
 protocol = "https"
 
+[vm.shares]
+cifsMountParams = "gid=1001,uid=1001,vers=3.0"
+nfsMountParams = ""
+
 [[emailTemplates]]
 name="session-status"
 source = "session-status.html"
