@@ -115,6 +115,7 @@ if (mainconf.get('version')) {
   process.exit(0);
 }
 
+logger.log('PID :' +  process.pid);
 logger.log('CWD :' +  process.cwd());
 logger.log('--------------------------------------------------');
 
