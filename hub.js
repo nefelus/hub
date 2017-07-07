@@ -1793,12 +1793,14 @@ function dupTicket(id) {
   if ((typeof Tickets['t' + id] !== 'undefined') && (Tickets['t' + id] != null)) {
     t = {};
     _.forOwn(Tickets['t' + id], function(v, k, o) {
-      if (! _.isFunction(o[k])) {
-        t[k] = _.cloneDeep(v);
+      if ((k === 'healthCheckTimer') || (k === 'consoleCheckTimer')) {
+        t[k] = null;
+      } else {
+        if (! _.isFunction(o[k])) {
+          t[k] = _.cloneDeep(v);
+        }
       }
     });
-    t.healthCheckTimer = null;
-    t.consoleCheckTimer = null;
     t.master.socket = null; // Do not use setMaster here!!!
   }
   return t;
