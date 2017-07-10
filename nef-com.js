@@ -6,6 +6,8 @@ var async = require('async');
 var toml = require('toml');
 var nconf = require('nconf');
 var AWS = require('aws-sdk');
+var mysql = require('mysql');
+var SQL = require('./sqlTemplates').sqlTemplates;
 var _ = require('lodash');
 var Table = require('cli-table');
 var env = process.env;
@@ -13,6 +15,9 @@ var nt = require(path.join(__dirname, './lib/tools'));
 var ec2;
 var ep = null;
 var myname;
+var mysqlPool = null;
+var mysqlConfig = null;
+var db;
 
 program
   .version('0.0.1')
@@ -25,45 +30,301 @@ program
   .option('-R, --region <region>', 'set the region');
 
 program
+   .command('addimage')
+   .description('Add a machine image in nefelus arsenal')
+   .option('-i, --image <imageid>', 'the ec2 image id to be used for launching machines')
+   .option('-t, --tools [toolids]', 'set list of tool ids, default is all tools (0)', listOfInts, [0])
+   .option('-v, --virtualization [type]', 'set virtualization type', /^(pv|hvm)$/i, 'pv')
+   .option('-l, --cloud [cloudid]', 'set the cloud id, default is #1', parseInt, 1)
+   .option('-d, --description [description]', 'set a small description')
+   .option('-a, --activate', 'set active flag')
+   .action(function(options){
+
+     if (options.description === undefined) {
+       options.description = '';
+     }
+     if ((options.tools === undefined) || (options.tools.length === 0)) {
+       options.tools = [0];
+     }
+     if (options.image !== undefined) {
+       awsSetup(program);
+       var params = {};
+       params = { Owners: ['self'] };
+       if (options.images && options.images.length > 0) {
+           params['ImageIds'] = [options.image];
+       }
+
+       ec2.describeImages(params, function(err, data) {
+         if (err) {
+           console.log(err, err.stack); // an error occurred
+         } else {
+           if (data.Images && data.Images.length) {
+             var lines = [];
+             options.tools.forEach(function(t) {
+               lines.push([options.image, t, options.cloud, options.virtualization, options.description, ((options.activate) ? 'Y' : 'N')]);
+             });
+
+             dbSetup(program);
+             mysqlPool = mysql.createPool(mysqlConfig);
+             mysqlPool.on('connection', function(connection) {
+             // console.log('new connection');
+             });
+
+             if (mysqlPool !== null) {
+
+               mysqlPool.getConnection(function(err, mysqlClient) {
+                 if (err) {
+                   console.log(err);
+                   process.exit(2);
+                   return;
+                 }
+
+                 var stmt = 'INSERT INTO IMAGES (AMI, TOOL_ID, CLOUD_ID, VIRTUALIZATION, DESCRIPTION, ACTIVE) VALUES ?';
+                 mysqlClient.query(stmt, [lines], function(err) {
+                   var exitCode = 0;
+                   if (err) {
+                     exitCode = 2;
+                     console.log(err);
+                   } else {
+                     console.log('Done');
+                   }
+                   mysqlClient.release();
+                   setTimeout(function(){mysqlPool.end(function(err) {process.exit(exitCode);});}, 1000);
+                 });
+               });
+             }
+           } else {
+             console.log('The specified image is not found');
+           }
+         }
+       });
+     } else {
+       console.log('You have to specify a valid ec2 image id');
+       process.exit(2);
+     }
+   });
+
+program
+   .command('activateimage')
+   .description('Activate image')
+   .option('-i, --ids <ids>', 'Activate images specified by their db ids from a comma separated list', listOfInts, [])
+   .action(function(options){
+     if (options.ids && options.ids.length > 0) {
+       var id;
+       var ids = '';
+       if ( options.ids.length == 1) {
+         ids = ' = '+id;
+       } else {
+         for (var i = 0; i < options.ids.length; i++) {
+           if (ids != '') {
+             ids += ',';
+           }
+           ids += id;
+         }
+         if (ids !== '') {
+           ids = ' IN ('+ids+')';
+         } else {
+           console.log('You have to specify at least a valid image id');
+           process.exit(2);
+         }
+       }
+
+       dbSetup(program);
+       mysqlPool = mysql.createPool(mysqlConfig);
+       mysqlPool.on('connection', function(connection) {
+       // console.log('new connection');
+       });
+
+       if (mysqlPool !== null) {
+
+         mysqlPool.getConnection(function(err, mysqlClient) {
+           if (err) {
+             console.log(err);
+             process.exit(2);
+             return;
+           }
+
+           var stmt = 'UPDATE IMAGES SET ACTIVE = "Y" where ID '+ids;
+           mysqlClient.query(stmt, function(err) {
+             var exitCode = 0;
+             if (err) {
+               exitCode = 2;
+               console.log(err);
+             } else {
+               console.log('Done');
+             }
+             mysqlClient.release();
+             setTimeout(function(){mysqlPool.end(function(err) {process.exit(exitCode);});}, 1000);
+           });
+         });
+       }
+     } else {
+       console.log('You have to specify at least one image id');
+     }
+   });
+
+program
+   .command('deactivateimage')
+   .description('Deactivate image')
+   .option('-i, --ids <ids>', 'Deactivate images specified by their db ids from a comma separated list', listOfInts, [])
+   .action(function(options){
+     if (options.ids && options.ids.length > 0) {
+       var id;
+       var ids = '';
+       if ( options.ids.length == 1) {
+         ids = ' = '+id;
+       } else {
+         for (var i = 0; i < options.ids.length; i++) {
+           if (ids != '') {
+             ids += ',';
+           }
+           ids += id;
+         }
+           ids = ' IN ('+ids+')';
+       }
+
+       dbSetup(program);
+       mysqlPool = mysql.createPool(mysqlConfig);
+       mysqlPool.on('connection', function(connection) {
+       // console.log('new connection');
+       });
+
+       if (mysqlPool !== null) {
+
+         mysqlPool.getConnection(function(err, mysqlClient) {
+           if (err) {
+             console.log(err);
+             process.exit(2);
+             return;
+           }
+
+           var stmt = 'UPDATE IMAGES SET ACTIVE = "N" where ID '+ids;
+           mysqlClient.query(stmt, function(err) {
+             var exitCode = 0;
+             if (err) {
+               exitCode = 2;
+               console.log(err);
+             } else {
+               console.log('Done');
+             }
+             mysqlClient.release();
+             setTimeout(function(){mysqlPool.end(function(err) {process.exit(exitCode);});}, 1000);
+           });
+         });
+       }
+     } else {
+       console.log('You have to specify at least one valid image id');
+     }
+   });
+
+program
    .command('showimages')
    .alias('images')
    .description('show current machine images')
    .option('-i, --images <ids>', 'show specific ids from a comma separated list', list, [])
+   .option('-n, --nefelus', 'show images used for running enduser sessions')
+   .option('-a, --active', 'show only active images if --nefelus option is selected')
    .action(function(options){
-     awsSetup(program);
 
-     var params = {};
-     params = { Owners: ['self'] };
-     if (options.images && options.images.length > 0) {
-         params['ImageIds'] = options.images;
-     }
-
-     ec2.describeImages(params, function(err, data) {
-       if (err) {
-           console.log(err, err.stack); // an error occurred
-       } else {
-         //console.log(JSON.stringify(data,null,'  ')); // successful response
-         var table = new Table({
-           style : {'compact' : true, 'padding-left': 0, 'padding-right': 0},
-           //colWidths: [12, 32, 5, 10, 8, 11],
-           head: ['ImageId', 'Name', 'Virtualization', 'RootDeviceType', 'Architecture', 'State']
-         });
-
-         if (data.Images && data.Images.length) {
-           data.Images.forEach(function (im) {
-             table.push([im.ImageId || '',
-                         im.Name || '',
-                         im.VirtualizationType ? ((im.VirtualizationType==='paravirtual')?'pv':im.VirtualizationType) : '',
-                         im.RootDeviceType || '',
-                         im.Architecture || '',
-                         im.State || '']);
-           });
-           console.log(table.toString());
-         } else {
-             console.log('No images found');
-         }
+     if (! options.nefelus) {
+       awsSetup(program);
+       var params = {};
+       params = { Owners: ['self'] };
+       if (options.images && options.images.length > 0) {
+           params['ImageIds'] = options.images;
        }
-     });
+
+       ec2.describeImages(params, function(err, data) {
+         if (err) {
+             console.log(err, err.stack); // an error occurred
+         } else {
+           //console.log(JSON.stringify(data,null,'  ')); // successful response
+           var table = new Table({
+             style : {'compact' : true, 'padding-left': 0, 'padding-right': 0},
+             //colWidths: [12, 32, 5, 10, 8, 11],
+             head: ['ImageId', 'Name', 'Virtualization', 'RootDeviceType', 'Architecture', 'State']
+           });
+
+           if (data.Images && data.Images.length) {
+             data.Images.forEach(function (im) {
+               table.push([im.ImageId || '',
+                           im.Name || '',
+                           im.VirtualizationType ? ((im.VirtualizationType==='paravirtual')?'pv':im.VirtualizationType) : '',
+                           im.RootDeviceType || '',
+                           im.Architecture || '',
+                           im.State || '']);
+             });
+             console.log(table.toString());
+           } else {
+             console.log('No images found');
+           }
+         }
+       });
+     } else {
+       dbSetup(program);
+       mysqlPool = mysql.createPool(mysqlConfig);
+       mysqlPool.on('connection', function(connection) {
+       // console.log('new connection');
+       });
+
+       if (mysqlPool !== null) {
+
+         mysqlPool.getConnection(function(err, mysqlClient) {
+           if (err) {
+             console.log(err);
+             process.exit(2);
+             return;
+           }
+
+
+           var stmt = 'SELECT i.ID, i.TOOL_ID, i.VIRTUALIZATION, c.NAME, i.AMI, i.DESCRIPTION, i.ACTIVE from IMAGES i, CLOUD c WHERE i.CLOUD_ID = c.ID';
+           if (options.active === true) {
+             stmt += ' and i.ACTIVE <> "N";';
+           }
+           mysqlClient.query(stmt, function(err, rows, fields) {
+             var exitCode = 0;
+             var record;
+             var table = new Table({
+               style : {'compact' : true, 'padding-left': 0, 'padding-right': 0},
+               //colWidths: [12, 32, 5, 10, 8, 11],
+               head: ['Id', 'AMI', 'ToolId', 'Cloud', 'Virtualization', 'Description', 'State']
+             });
+             if (err) {
+               exitCode = 2;
+               console.log(err);
+             } else {
+               var records=[];
+               for (var i = 0; i < rows.length; i++) {
+                 record = {};
+                 for (var j = 0; j < fields.length; j++) {
+                   record[fields[j].name.toLowerCase()] = (rows[i][fields[j].name] !== null) ? rows[i][fields[j].name] : '';
+                   if (typeof record[fields[j].name.toLowerCase()] === 'object') {
+                     record[fields[j].name.toLowerCase()] += '';
+                   }
+                 }
+                 records.push(record);
+               }
+               if (records.length) {
+                 records.forEach(function (im) {
+                   table.push([im.id || '',
+                               im.ami || '',
+                               im.tool_id,
+                               im.name || '',
+                               im.virtualization,
+                               im.description || '',
+                               ((im.active == 'N') ? 'Inactive' : 'Active')]);
+                 });
+                 console.log(table.toString());
+               } else {
+                   console.log('No images found');
+               }
+             }
+             mysqlClient.release();
+             setTimeout(function(){mysqlPool.end(function(err) {process.exit(exitCode);});}, 1000);
+           });
+         });
+       }
+     }
 
    }).on('--help', function() {
     console.log('  Examples:');
@@ -242,7 +503,7 @@ program
      awsSetup(program);
 
      var params = {
-       AvailabilityZone: options.zone, // required 
+       AvailabilityZone: options.zone, // required
        Size: options.size // required
      };
      ec2.createVolume(params, function(err, data) {
@@ -268,7 +529,7 @@ program
      awsSetup(program);
 
      var params = {
-       VolumeId: options.volume, // required 
+       VolumeId: options.volume, // required
        Description: options.note || '',
      };
      ec2.createSnapshot(params, function(err, data) {
@@ -337,7 +598,22 @@ program.parse(process.argv);
 //console.log(program);
 if (!program.args.length) program.help();
 
-function awsSetup(program) {
+function dbSetup(program) {
+  Setup(program);
+  db = nconf.get('database');
+  mysqlConfig = {
+    'host'     : db.host,
+    'user'     : db.user,
+    'password' : db.password,
+    'database' : db.database,
+    'connectTimeout'  : db.connectTimeout || 30000,
+    'acquireTimeout'  : db.acquireTimeout || 30000,
+    'multipleStatements' : true,
+    'timezone' : 'Z'
+  };
+}
+
+function Setup(program) {
   var isJX = (path.basename(process.argv[0]) === 'jx');
   var isPkg = (process.versions.pkg !== undefined);
 
@@ -401,7 +677,10 @@ function awsSetup(program) {
          ignoreInstallationIdInFilemanagerOps : false,
          hasAutoAssignFloatingIp : true
        });
+}
 
+function awsSetup(program) {
+  Setup(program);
   var aws = nconf.get('aws');
   var awsParams = {'accessKeyId'     : program.apiKey || nconf.get('aws:ec2:accessKeyId'),
                    'secretAccessKey' : program.apiSecret || nconf.get('aws:ec2:secretAccessKey'),
@@ -412,7 +691,7 @@ function awsSetup(program) {
 
   if (program.apiEndpoint) {
     ep = new AWS.Endpoint(program.apiEndpoint);
-  } else if (! nt.isEmpty(aws.ec2.endpoint)) {
+  } else if ((aws.ec2.endpoint) && (! nt.isEmpty(aws.ec2.endpoint))) {
     var _ep = aws.ec2.endpoint;
     var epproto = _ep.protocol || 'http';
     var epport = ((_ep.port == 80) && (epproto == 'http')) ? '' : (((_ep.port == 443) && (epproto == 'https')) ? '' : ':'+_ep.port);
@@ -437,6 +716,16 @@ function range(val) {
 
 function listNum(val) {
   return val.split(',').map(Number);
+}
+
+function listOfInts(val) {
+  var ints = [];
+  val.split(',').forEach(function(v) {
+    if (! isNaN(parseInt(v, 10))) {
+      ints.push(parseInt(v, 10));
+    }
+  });
+  return ints;
 }
 
 function list(val) {
