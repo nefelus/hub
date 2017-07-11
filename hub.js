@@ -4,9 +4,11 @@
 //
 // Author    : Giannis Kosmas <kosmasgiannis@gmail.com>
 // Date      : 2012-12-26
-// Copyright : Nefelus INC,  2012-2016
+//
+// This file is subject to the terms and conditions defined in
+// file 'LICENSE.txt', which is part of this source code package.
+//
 //------------------------------------------------------------------------
-
 /*
 var memwatch = require('memwatch');
 var heapdump = require('heapdump');
