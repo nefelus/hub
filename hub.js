@@ -1260,6 +1260,7 @@ function startMaster(ticket, cb) {
                   if (n.fstype === 'nfs') {
                     fstype = 'n';
                     fsExtraParams = mainconf.get('vm:shares:nfsMountParams') || '';
+                    //TODO: if (n.encrypted === 'Y') { }
                   } else if (n.fstype === 'cifs') {
                     fstype = 'c';
                     fsExtraParams = mainconf.get('vm:shares:cifsMountParams') || '';
@@ -1271,6 +1272,11 @@ function startMaster(ticket, cb) {
                       fsExtraParams += 'username='+creds[3]+',password='+creds[4];
                     } else {
                       fsExtraParams += 'username='+creds[1]+',password='+creds[2];
+                    }
+                    if (n.encrypted === 'Y') {
+                      if (fsExtraParams.match(/(^|[,])(seal)($|[,])/) === null) {
+                        fsExtraParams += ',seal';
+                      }
                     }
                   }
                   if (fsExtraParams !== '') {
