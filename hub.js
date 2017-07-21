@@ -286,6 +286,9 @@ function loadConfig() {
   var appConfigData = fs.readFileSync(path.join(appConfigDir, 'hub.conf'), 'utf-8');
   var commonConfig;
   var appConfig;
+  var dbSSLkey = '';
+  var dbSSLcert = '';
+  var dbSSLca = '';
   try {
     commonConfig = toml.parse(commonConfigData);
   } catch (e) {
@@ -526,6 +529,33 @@ function loadConfig() {
     'acquireTimeout'  : db.acquireTimeout || 30000,
     'timezone' : 'Z'
   };
+  if (db.sslkey !== '') {
+    if (nt.isReadableSync(db.sslkey)) {
+      dbSSLkey = fs.readFileSync(db.sslkey);
+    } else {
+      logger.log('Warning: file '+db.sslkey+' is not readable.');
+    }
+  }
+  if (db.sslcert !== '') {
+    if (nt.isReadableSync(db.sslcert)) {
+      dbSSLcert = fs.readFileSync(db.sslcert);
+    } else {
+      logger.log('Warning: file '+db.sslcert+' is not readable.');
+    }
+  }
+  if (db.sslca !== '') {
+    if (nt.isReadableSync(db.sslca)) {
+      dbSSLca = fs.readFileSync(db.sslca);
+    } else {
+      logger.log('Warning: file '+db.sslca+' is not readable.');
+    }
+  }
+  if ((dbSSLkey !== '') || (dbSSLcert !== '') || (dbSSLca !== '')) {
+    mysqlConfig.ssl = { key: dbSSLkey,
+                        cert: dbSSLcert,
+                        ca: dbSSLca
+                      };
+  }
   SKIP_CYCLES = mainconf.get('skipCycles') || 4;
   setupMySQL(mysqlConfig);
   emailTemplates = mainconf.get('emailTemplates') || [];
