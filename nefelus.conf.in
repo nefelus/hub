@@ -20,6 +20,9 @@ database = "data"
 queryinterval = 5000
 connectTimeout = 30000
 acquireTimeout = 30000
+sslkey = "/path/to/nefelus/ssl/mysql/client-key.pem"
+sslcert = "/path/to/nefelus/ssl/mysql/client-cert.pem"
+sslca = "/path/to/nefelus/ssl/mysql/ca.pem"
 
 [ssl]
 key = "/path/to/ssl/key"

@@ -21,7 +21,6 @@ var ep = null;
 var myname;
 var mysqlPool = null;
 var mysqlConfig = null;
-var db;
 
 program
   .version('0.0.1')
@@ -604,7 +603,10 @@ if (!program.args.length) program.help();
 
 function dbSetup(program) {
   Setup(program);
-  db = nconf.get('database');
+  var db = nconf.get('database');
+  var dbSSLkey = '';
+  var dbSSLcert = '';
+  var dbSSLca = '';
   mysqlConfig = {
     'host'     : db.host,
     'user'     : db.user,
@@ -615,6 +617,34 @@ function dbSetup(program) {
     'multipleStatements' : true,
     'timezone' : 'Z'
   };
+  if (db.sslkey !== '') {
+    if (nt.isReadableSync(db.sslkey)) {
+      dbSSLkey = fs.readFileSync(db.sslkey);
+    } else {
+      logger.log('Warning: file '+db.sslkey+' is not readable.');
+    }
+  }
+  if (db.sslcert !== '') {
+    if (nt.isReadableSync(db.sslcert)) {
+      dbSSLcert = fs.readFileSync(db.sslcert);
+    } else {
+      logger.log('Warning: file '+db.sslcert+' is not readable.');
+    }
+  }
+  if (db.sslca !== '') {
+    if (nt.isReadableSync(db.sslca)) {
+      dbSSLca = fs.readFileSync(db.sslca);
+    } else {
+      logger.log('Warning: file '+db.sslca+' is not readable.');
+    }
+  }
+  if ((dbSSLkey !== '') || (dbSSLcert !== '') || (dbSSLca !== '')) {
+    mysqlConfig.ssl = { key: dbSSLkey,
+                        cert: dbSSLcert,
+                        ca: dbSSLca
+                      };
+  }
+
 }
 
 function Setup(program) {
