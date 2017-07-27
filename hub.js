@@ -159,6 +159,7 @@ var EC2_MAX_TRIES;
 
 var keyName;
 var securityGroup;
+var defaultSubnetId;
 var workerUsername;
 var setloginuser;
 var setsecgroups;
@@ -487,6 +488,7 @@ function loadConfig() {
   staticUserData = mainconf.get('staticUserData') || {};
   keyName = mainconf.get('aws:ec2:keyName') || null;
   securityGroup = mainconf.get('aws:ec2:securityGroup') || 'default';
+  defaultSubnetId = mainconf.get('aws:ec2:SubnetId') || null;
   setloginuser = mainconf.get('setloginuser') || false;
   setsecgroups = mainconf.get('setsecgroups') || false;
   hasAutoAssignFloatingIp = mainconf.get('hasAutoAssignFloatingIp');
@@ -1490,6 +1492,10 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
     SecurityGroups : [securityGroup],
     InstanceType   : speed
   };
+
+  if (defaultSubnetId !== null) {
+    args['SubnetId'] = defaultSubnetId;
+  }
 
   if (keyName !== null) {
     args['KeyName'] = keyName;

@@ -46,6 +46,7 @@ region = ""
 zone = ""
 keyName = "worker-key"
 securityGroup = "master"
+#SubnetId = "subnet-00000000"
 
 [aws.ec2.endpoint]
 protocol = "http"
