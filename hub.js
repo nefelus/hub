@@ -50,7 +50,7 @@ var archiver   = require('archiver');
 var AWS = require('aws-sdk');
 
 var dns           = require('./lib/dns');
-var UUID       = require('uuid');
+var UUID       = require('uuid/v4');
 var exec       = require('child_process').exec;
 var tmp        = require('tmp');
 var moment     = require('moment-timezone');
