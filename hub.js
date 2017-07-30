@@ -531,21 +531,21 @@ function loadConfig() {
     'acquireTimeout'  : db.acquireTimeout || 30000,
     'timezone' : 'Z'
   };
-  if (db.sslkey !== '') {
+  if ((db.sslkey) && (db.sslkey !== '')) {
     if (nt.isReadableSync(db.sslkey)) {
       dbSSLkey = fs.readFileSync(db.sslkey);
     } else {
       logger.log('Warning: file '+db.sslkey+' is not readable.');
     }
   }
-  if (db.sslcert !== '') {
+  if ((db.sslcert) && (db.sslcert !== '')) {
     if (nt.isReadableSync(db.sslcert)) {
       dbSSLcert = fs.readFileSync(db.sslcert);
     } else {
       logger.log('Warning: file '+db.sslcert+' is not readable.');
     }
   }
-  if (db.sslca !== '') {
+  if ((db.sslca) && (db.sslca !== '')) {
     if (nt.isReadableSync(db.sslca)) {
       dbSSLca = fs.readFileSync(db.sslca);
     } else {
