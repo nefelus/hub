@@ -789,6 +789,40 @@ function getTicketIdByInstanceId(id) {
   return null;
 }
 
+function distillTicket(ticket) {
+  var t = {};
+  t.id = ticket.id;
+  t.ticketStatus = ticket.ticketStatus;
+  t.cancelPending = ticket.cancelPending;
+  t.sessionStatus = ticket.sessionStatus;
+  t.jobStatus = ticket.jobStatus;
+  t.created = ticket.created;
+  t.machineStarted = ticket.machineStarted;
+  t.jobStarted = ticket.jobStarted;
+  t.logConsole = ticket.logConsole;
+  t.vncConsole = ticket.vncConsole;
+  t.loginuser = ticket.loginuser;
+  t.uuid = ticket.uuid;
+
+  t.sessionId = ticket.req.sessionId;
+  t.runas = ticket.req.runas;
+  t.machineSpeed = ticket.req.machineSpeed;
+  t.instanceType = ticket.req.instanceType;
+  t.ami = ticket.req.ami;
+  t.commandFile = ticket.req.commandFile;
+  t.runningDir = ticket.req.runningDir;
+  t.licenseManager = ticket.req.licenseManager;
+  t.jobType = ticket.req.jobType;
+
+  t.instanceId = ticket.master.instanceId;
+  t.ip = ticket.master.ip;
+  t.publicIp = ticket.master.publicIp;
+  t.publicDnsName = ticket.master.publicDnsName;
+  t.aliasDnsName = ticket.master.aliasDnsName;
+
+  return t;
+}
+
 function recoverStatus(sqlpool, id, mystatus) {
   if (DB_UPDATES === false) {
     return;
@@ -2902,7 +2936,15 @@ io.on('connection', function (socket) {
       switch (cmd.command) {
         case 'showsessions' :
           mesg.status = 'ok';
-          mesg.message = JSON.stringify(Tickets);
+          var T = [];
+          for (var key in Tickets) {
+            var ticket = Tickets[key];
+            if (ticket !== null) {
+              T.push(distillTicket(ticket));
+            }
+          }
+          mesg.message = JSON.stringify(T);
+          T = null;
           socket.emit('admincmd_finished', JSON.stringify(mesg));
           break;
         case 'shutdown' :
