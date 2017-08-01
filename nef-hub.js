@@ -239,7 +239,24 @@ function _callHub(cmd, options) {
     socket.on('admincmd_finished', function (data) {
       if (nt.isSafeJSON(data)) {
         var j = JSON.parse(data);
-        console.log('('+j.status+'): '+j.message);
+        if (j.status == 'ok') {
+          var m = JSON.parse(j.message);
+          if (cmd == 'showsessions') {
+            m.forEach(function(s, i) {
+              if (i !== 0) {
+                console.log('');
+              }
+              console.log('- '+i+' -');
+              for (var key in s) {
+               console.log(key+' = '+s[key]);
+              }
+            });
+          } else {
+            console.log('('+j.status+'): '+j.message);
+          }
+        } else {
+          console.log('('+j.status+'): '+j.message);
+        }
       } else {
         console.log('Got bogus message:'+data);
       }
