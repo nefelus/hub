@@ -13,7 +13,7 @@ var AWS = require('aws-sdk');
 var mysql = require('mysql');
 var SQL = require('./sqlTemplates').sqlTemplates;
 var _ = require('lodash');
-var Table = require('cli-table');
+var Table = require('cli-table2');
 var env = process.env;
 var nt = require(path.join(__dirname, './lib/tools'));
 var ec2;
