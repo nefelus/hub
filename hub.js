@@ -42,6 +42,7 @@ var toml       = require('toml');
 var nt         = require('./lib/tools');
 var http       = require('http');
 var https      = require('https');
+var request = require('request');
 var _          = require('lodash');
 var fs         = require('fs');
 var concat     = require('concat-stream');
@@ -169,6 +170,7 @@ var hubType;
 var hubPort;
 var hubHost;
 var hubProtocol;
+var filemanager;
 
 var timezone = null;
 var vncLocalOnly;
@@ -197,6 +199,8 @@ var r53;
 var cancelHours = 0;
 var forceCancelHours = 0;
 var cancelHoursTimer = null;
+var deactivateNFSSharesOfOldInstancesTimer = null;
+var useDynamicNFSShares = false;
 var licserverInfo;
 var nslm = null;
 var nslmSessionIsActive = NSLM_BYPASS; // If we bypass license checking, it permits hub operations.
@@ -315,6 +319,7 @@ function loadConfig() {
           });
 
   timezone = mainconf.get('timezone') || null;
+  filemanager = mainconf.get('filemanager') || null;
   hubPort = mainconf.get('port');
   hubHost = mainconf.get('host');
   var ssl = mainconf.get('ssl');
@@ -516,6 +521,20 @@ function loadConfig() {
       cancelHoursTimer = null;
     }
   }
+  useDynamicNFSShares = mainconf.get('useDynamicNFSShares') || false;
+  if (useDynamicNFSShares === true) {
+    if (filemanager === null) {
+      logger.log('WARNING: Filemanager in not defined.');
+    }
+    if (deactivateNFSSharesOfOldInstancesTimer === null) {
+      deactivateNFSSharesOfOldInstancesTimer = setInterval(function() {deactivateNFSSharesOfOldInstances();}, 180000); // check every 3 minutes
+    }
+  } else {
+    if (deactivateNFSSharesOfOldInstancesTimer !== null) {
+      clearInterval(deactivateNFSSharesOfOldInstancesTimer);
+      deactivateNFSSharesOfOldInstancesTimer = null;
+    }
+  }
   adminEmail = mainconf.get('adminEmail');
   masterDebug = mainconf.get('vm:masterDebug') || false;
   MAX_RUNNING_JOBS_ALLOWED = mainconf.get('maxRunningJobsAllowed') || 0;
@@ -529,6 +548,7 @@ function loadConfig() {
     'database' : db.database,
     'connectTimeout'  : db.connectTimeout || 30000,
     'acquireTimeout'  : db.acquireTimeout || 30000,
+    'multipleStatements' : true,
     'timezone' : 'Z'
   };
   if ((db.sslkey) && (db.sslkey !== '')) {
@@ -618,6 +638,13 @@ function Ticket(id) {
   this.vncConsole = null;
   this.loginuser = 'nefelus';
   this.useradmin = '';
+
+  this.dynamicNFSShares = {
+    activated : false,
+    deactivated : true,
+    allowedIPs : [],
+    shares : []
+  };
 
   this.done = {
     'preinit' : false,
@@ -717,6 +744,30 @@ function Ticket(id) {
       return this.req[name];
     }
     return null;
+  };
+
+  this.setDynamicNFSShare = function (name, value) {
+    switch (name) {
+      case 'resetips' :
+        this.dynamicNFSShares.allowedIPs = [];
+        break;
+      case 'resetshares' :
+        this.dynamicNFSShares.shares = [];
+        break;
+      case 'ip' :
+        if ((value !== undefined) && (value !== null) && (value !== '')) {
+          this.dynamicNFSShares.allowedIPs.push(value);
+        }
+        break;
+      case 'share' :
+        if ((value !== undefined) && (value !== null)) {
+          this.dynamicNFSShares.shares.push(value);
+        }
+        break;
+      default:
+        this.dynamicNFSShares[name] = value;
+        break;
+    }
   };
 
   this.setMaster = function (name, value) {
@@ -1039,6 +1090,195 @@ function forceRestartMaster(instanceId, sessionId) {
   }
 }
 
+function deactivateNFSSharesOfOldInstances() {
+  if (ec2 === undefined) {
+    logger.log('EC2 is not defined yet.');
+    return;
+  }
+  if (filemanager === null) {
+    logger.log('WARNING: Filemanager in not defined.');
+    return;
+  }
+  if (mysqlPool !== null) {
+    mysqlPool.getConnection(function(err, mysqlClient) {
+      if (err) {
+        logger.log(err);
+        return;
+      }
+
+      mysqlClient.query(SQL.deactivateNFSSharesOfOldInstances, function(err, rows, fields) {
+
+        mysqlClient.release();
+
+        if (err) {
+          logger.log('Error from MYSQL query:');
+          logger.log(err);
+          return;
+        }
+        if (rows.length) {
+          var NFSinstances = [];
+          for (var i = 0; i < rows.length; i++) {
+            NFSinstances.push(rows[i]['INSTANCE_ID']);
+          }
+          var args = {
+            Filters : [ { Name : "instance-id", Values : NFSinstances }]
+          };
+          var activeInstances=[];
+          ec2.describeInstances(args, function(err, data) {
+            //console.log(util.inspect(data, {depth: null}));
+            for (var i=0; i<data.Reservations.length; i++) {
+              for (var j=0; j<data.Reservations[i].Instances.length; j++) {
+                //console.log(data.Reservations[i].Instances[j].InstanceId);
+                activeInstances.push(data.Reservations[i].Instances[j].InstanceId);
+              }
+            }
+            var deadInstances = _.difference(NFSinstances, activeInstances);
+            if (deadInstances.length > 0) {
+              var options = {
+                method: 'POST',
+                json: true,
+                body: {instanceId: deadInstances},
+                followRedirect: true,
+                timeout : 10000,
+                strictSSL : false,
+                uri: filemanager + '/deactivateNFSshares'
+              };
+
+              request(options, function(error, response, body) {
+                if (error) {
+                  logger.log('deactivateNFSSharesOfOldInstances: ERROR sending request to filemanager.');
+                  logger.log(util.inspect(error, {depth:null}));
+                } else {
+                  if ((String(response.statusCode) !== '200') || ((String(response.statusCode) === '200') && (body.status === 'error'))) {
+                    logger.log('ERROR getting deactivateNFSshares response from filemanager. ('+response.statusCode+'), message: ' + body.message);
+                    logger.log('deactivateNFSSharesOfOldInstances: ERROR getting response from filemanager.');
+                    logger.log(util.inspect(body, {depth:null}));
+                  }
+                }
+              });
+            }
+          });
+        }
+      });
+    });
+  } else {
+    logger.log('ERROR: MySQL Pool has not been created.');
+  }
+}
+
+function activateNFSShares(instanceId, sessionId) {
+  var myticket = getTicketIdByInstanceId(instanceId);
+  if (myticket !== null) {
+    var ticket = Tickets[myticket];
+    if ((ticket.dynamicNFSShares.activated === true) ||
+        (ticket.master.instanceId === '') ||
+        (ticket.dynamicNFSShares.allowedIPs.length === 0) ||
+        (ticket.dynamicNFSShares.shares.length === 0)) {
+        return;
+    } else {
+      // prepare mysql
+      var ips = _.uniq(ticket.dynamicNFSShares.allowedIPs);
+      var vals = [];
+      var payload = { 'instanceId' : ticket.master.instanceId,
+                      'shares' : ticket.dynamicNFSShares.shares,
+                      'ips' : ips
+                    };
+      ips = ips.join(',')
+      ticket.dynamicNFSShares.shares.forEach(function (u) {
+        vals.push([u.uuid, u.mount_params, ticket.master.instanceId, ips, 'Y']);
+      });
+
+      if (mysqlPool !== null) {
+        mysqlPool.getConnection(function(err, mysqlClient) {
+          if (err) {
+            logger.log(err);
+            return;
+          }
+
+          mysqlClient.query(SQL.addNFSActiveMountpoints, [vals], function(err) {
+            if (err) {
+              logger.log(sessionId +': Error from MYSQL query:');
+              logger.log(err);
+            } else {
+              var options = {
+                method: 'POST',
+                body: payload,
+                json: true,
+                followRedirect: true,
+                timeout : 10000,
+                strictSSL : false,
+                uri: filemanager + '/activateNFSshares'
+              };
+
+              request(options, function(error, response, body) {
+                if (error) {
+                  logger.log(sessionId + 'ERROR sending activateNFSshares request to filemanager.');
+                  logger.log(util.inspect(error, {depth:null}));
+                } else {
+                  if ((String(response.statusCode) !== '200') || ((String(response.statusCode) === '200') && (body.status === 'error'))) {
+                    logger.log('ERROR getting activateNFSshares response from filemanager. ('+response.statusCode+'), message: ' + body.message);
+                    logger.log(util.inspect(body, {depth:null}));
+                  } else {
+                    ticket.setDynamicNFSShare('activated', true);
+                    ticket.setDynamicNFSShare('deactivated', false);
+                  }
+                }
+              });
+            }
+            mysqlClient.release();
+            return;
+          });
+        });
+      } else {
+        logger.log('ERROR: MySQL Pool has not been created.');
+      }
+    }
+  } else {
+    logger.warn('Activate NFS Shares : Unable to find instance ' + instanceId);
+  }
+}
+
+function deactivateNFSShares(instanceId) {
+  var myticket = getTicketIdByInstanceId(instanceId);
+  if (myticket !== null) {
+    var ticket = Tickets[myticket];
+    if ((ticket.dynamicNFSShares.deactivated === true) ||
+        (ticket.master.instanceId === '') ||
+        (ticket.dynamicNFSShares.allowedIPs.length === 0) ||
+        (ticket.dynamicNFSShares.shares.length === 0)) {
+        return;
+    } else {
+      var sessionId = ticket.getRequest('sessionId') || 'unknown';
+      var options = {
+        method: 'POST',
+        body: {instanceId: [instanceId]},
+        json: true,
+        followRedirect: true,
+        timeout : 10000,
+        strictSSL : false,
+        uri: filemanager + '/deactivateNFSshares'
+      };
+
+      request.get(options, function(error, response, body) {
+        if (error) {
+          logger.log(sessionId + 'ERROR sending deactivateNFSshares request to filemanager.');
+          logger.log(util.inspect(error, {depth:null}));
+        } else {
+          if (String(response.statusCode) !== '200') {
+            logger.log(sessionId + 'ERROR getting deactivateNFSshares response from filemanager. ('+response.statusCode+')');
+            logger.log(util.inspect(body, {depth:null}));
+          } else {
+            ticket.setDynamicNFSShare('deactivated', true);
+            ticket.setDynamicNFSShare('activated', false);
+          }
+        }
+      });
+    }
+  } else {
+    logger.warn('Deactivate NFS Shares : Unable to find instance ' + instanceId);
+  }
+}
+
 function restartMaster(instanceId, sessionId) {
   var myticket = getTicketIdBySessionId(sessionId);
   if (myticket !== null) {
@@ -1048,6 +1288,9 @@ function restartMaster(instanceId, sessionId) {
     }
     var rl = ticket.get('restartLimit');
     ticket.set('restartLimit', rl - 1);
+    if (useDynamicNFSShares === true) {
+      deactivateNFSShares(instanceId);
+    }
     // Delete previous Route53 records, if any.
     dns.deleteCNAME(r53, r53info, ticket.getMaster('aliasDnsName'), ticket.getMaster('publicDnsName'), function(err, r53data) {
       if (err) {
@@ -1085,6 +1328,9 @@ function restartMaster(instanceId, sessionId) {
             ticket.setMaster('instanceId', data[0].instanceId);
             ticket.setMaster('ip', data[0].ip);
             ticket.setMaster('publicIp', data[0].publicIp);
+            ticket.setDynamicNFSShare('resetips', null);
+            ticket.setDynamicNFSShare('ip', data[0].ip);
+            ticket.setDynamicNFSShare('ip', data[0].publicIp);
             ticket.setMaster('publicDnsName', data[0].dnsName);
             ticket.setMaster('aliasDnsName', '');
             switch (dnsPostprocess) {
@@ -1121,6 +1367,9 @@ function restartMaster(instanceId, sessionId) {
                   }
                 });
                 break;
+            }
+            if (useDynamicNFSShares === true) {
+              activateNFSShares(data[0].instanceId, sessionId);
             }
             ticket.healthCheckTimer = setInterval(function() {
               InstanceHealthCheck(data[0].instanceId, sessionId, [
@@ -1315,6 +1564,7 @@ function startMaster(ticket, cb) {
               userData['xterm'] = toolXtermSupport;
 
               userData['totalshares'] = allShares.length;
+              ticket.setDynamicNFSShare('resetshares', null);
               allShares.forEach(function(n, i) {
                 var fstype = '@';
                 var fsExtraParams = '';
@@ -1325,8 +1575,9 @@ function startMaster(ticket, cb) {
 
                   if (n.fstype === 'nfs') {
                     fstype = 'n';
-                    fsExtraParams = mainconf.get('vm:shares:nfsMountParams') || '';
                     //TODO: if (n.encrypted === 'Y') { }
+                    fsExtraParams = mainconf.get('vm:shares:nfsMountParams') || '';
+                    ticket.setDynamicNFSShare('share', {uuid: n.uuid, mount_params: (((n.mountParams!==null) && (n.mountParams!=='')) ? (n.mountParams) : 'ro')});
                   } else if (n.fstype === 'cifs') {
                     fstype = 'c';
                     fsExtraParams = mainconf.get('vm:shares:cifsMountParams') || '';
@@ -2282,6 +2533,8 @@ var dispatcher = function dispatcher () {
                                             t.setMaster('instanceId', data[0].instanceId);
                                             t.setMaster('ip', data[0].ip);
                                             t.setMaster('publicIp', data[0].publicIp);
+                                            t.setDynamicNFSShare('ip', data[0].ip);
+                                            t.setDynamicNFSShare('ip', data[0].publicIp);
                                             t.setMaster('publicDnsName', data[0].dnsName);
                                             t.setMaster('aliasDnsName', '');
                                             switch (dnsPostprocess) {
@@ -2319,6 +2572,9 @@ var dispatcher = function dispatcher () {
                                                   }
                                                 });
                                                 break;
+                                            }
+                                            if (useDynamicNFSShares === true) {
+                                              activateNFSShares(data[0].instanceId, sessionId);
                                             }
                                             t.healthCheckTimer = setInterval(function() {
                                               InstanceHealthCheck(data[0].instanceId, sessionId, [
@@ -3522,7 +3778,12 @@ function handleHello(socket, instanceId, ticket, msg) {
   var servername = msg.servername || '';
   var mysqlKeys;
   var mysqlValues;
+
+
   if (sessionId !== null) {
+    if (useDynamicNFSShares === true) {
+      deactivateNFSShares(instanceId);
+    }
     var jobType = Tickets[ticket].getRequest('jobType') || 'batch';
     if (Tickets[ticket].healthCheckTimer) {
       clearInterval(Tickets[ticket].healthCheckTimer);
@@ -3586,6 +3847,9 @@ function handleHello(socket, instanceId, ticket, msg) {
   } else {
     recoverTicketFromInternalState(mysqlPool, 'INSTANCE_ID', instanceId, function (err, data) {
       if (data === null) {
+        if (useDynamicNFSShares === true) {
+          deactivateNFSShares(instanceId);
+        }
         logger.log('ERROR: Could not find corresponding session for Instance ' + instanceId);
         if (reqID !== null) {
           mysqlKeys = ['NOTE'];
