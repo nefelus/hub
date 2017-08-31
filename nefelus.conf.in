@@ -10,6 +10,7 @@ adminEmail = "admin@example.com"
 timezone = "UTC"
 username =  "nefelus"
 ignoreInstallationIdInFilemanagerOps = false
+useDynamicNFSShares = true
 
 [database]
 host = "hub.exampe.com"

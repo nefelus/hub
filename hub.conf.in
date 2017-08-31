@@ -10,6 +10,8 @@ hubType = "production"
 host = "hub.example.com"
 port = 8585
 
+filemanager = "https://hub.example.com:8888"
+
 maxRunningJobsAllowed = 10
 hasAutoAssignFloatingIp : false
 skipCycles = 8
