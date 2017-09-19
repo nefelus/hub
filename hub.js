@@ -1774,9 +1774,15 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
     MinCount       : count,
     MaxCount       : count,
     UserData       : udb.toString('base64'),
-    SecurityGroups : [securityGroup],
     InstanceType   : speed
   };
+
+  if (defaultSubnetId !== null) {
+    args['SubnetId'] = defaultSubnetId;
+    args['SecurityGroupIds'] = [securityGroup];
+  } else {
+    args['SecurityGroups'] = [securityGroup];
+  }
 
   if (defaultSubnetId !== null) {
     args['SubnetId'] = defaultSubnetId;
