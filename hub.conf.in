@@ -53,6 +53,9 @@ username = "nefelus"
 masterDebug = true
 heartbeatInterval = 60000
 x11IdleTimeout = 0
+# set the size of VM's root volume (applicable only at Amazon, OpenStack does not support it yet)
+# if set to zero the image snapshot size is used.
+rootVolumeSize = 0
 homeBlacklistPatterns = [ "!/home/nefelus/.Xauthority"
                         , "!/home/nefelus/.bashrc*"
                         , "!/home/nefelus/.twmrc"
