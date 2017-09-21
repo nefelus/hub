@@ -162,6 +162,7 @@ var keyName;
 var securityGroup;
 var defaultSubnetId;
 var workerUsername;
+var defaultRootVolumeSize;
 var setloginuser;
 var setsecgroups;
 var hasAutoAssignFloatingIp;
@@ -498,6 +499,11 @@ function loadConfig() {
   setsecgroups = mainconf.get('setsecgroups') || false;
   hasAutoAssignFloatingIp = mainconf.get('hasAutoAssignFloatingIp');
   workerUsername = mainconf.get('vm:username');
+  defaultRootVolumeSize = mainconf.get('vm:rootVolumeSize') || 0;
+  defaultRootVolumeSize = parseInt(defaultRootVolumeSize, 10);
+  if (isNaN(defaultRootVolumeSize)) {
+    defaultRootVolumeSize = 0;
+  }
   logURLproto = mainconf.get('vm:logURL:protocol');
   vncURLproto = mainconf.get('vm:vncURL:protocol');
   cmdURLproto = mainconf.get('vm:cmdURL:protocol');
@@ -1756,6 +1762,7 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
 
   var speed = machines.getSpeed(machineId);
   var noOfEphemeralVols = machines.getEphemeral(machineId) || 0;
+  // FIXME : get rootVolumeSize from machines.
   var blockDeviceMappings = [];
 
   // If we want to resize the root volume we should add the following entry to the device mappings
@@ -1790,6 +1797,12 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
 
   if (keyName !== null) {
     args['KeyName'] = keyName;
+  }
+
+  if (defaultRootVolumeSize !== 0) {
+    blockDeviceMappings.push({ 'DeviceName' : '/dev/sda1',
+                               'Ebs' : { 'DeleteOnTermination' : true, 'VolumeSize': defaultRootVolumeSize}
+                             });
   }
 
   if (blockDeviceMappings.length) {
