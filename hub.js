@@ -1762,12 +1762,15 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
 
   var speed = machines.getSpeed(machineId);
   var noOfEphemeralVols = machines.getEphemeral(machineId) || 0;
-  // FIXME : get rootVolumeSize from machines.
   var blockDeviceMappings = [];
 
-  // If we want to resize the root volume we should add the following entry to the device mappings
-  // by setting the VolumeSize accordingly.
-  // {DeviceName : '/dev/sda1', Ebs : {VolumeSize : 15  }  }
+  // Setting root volume size is currently applicable only at Amazon deployments
+  var rootVolumeSize = parseInt(machines.getRootDiskSize(machineId), 10) || defaultRootVolumeSize;
+  if (rootVolumeSize !== 0) {
+    blockDeviceMappings.push({'DeviceName' : '/dev/sda1',
+                              'Ebs' : { 'DeleteOnTermination' : true, 'VolumeSize': rootVolumeSize}
+                             });
+  }
 
   for (k = 0; k < noOfEphemeralVols; k++) {
     blockDeviceMappings.push({
@@ -1785,7 +1788,7 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
   };
 
   if (defaultSubnetId !== null) {
-    args['SubnetId'] = defaultSubnetId;
+    args['SubnetId'] = machines.getSubnetId(machineId) || defaultSubnetId;
     args['SecurityGroupIds'] = [securityGroup];
   } else {
     args['SecurityGroups'] = [securityGroup];
