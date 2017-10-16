@@ -1423,7 +1423,6 @@ function ro2rw(s) {
   return s;
 }
 
-
 function startMaster(ticket, cb) {
   var userData = {};
   for (var sudKey in staticUserData) {
@@ -2815,7 +2814,6 @@ io.on('connection', function (socket) {
   socket.on('set_viewers', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var reqID = null;
       var myticket = getTicketIdBySessionId(sessionId);
@@ -2910,7 +2908,6 @@ io.on('connection', function (socket) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
       var sessionId = msg.sessionId || '';
-      //var APIversion = msg.APIversion || '1.0';
       var status = msg.status || '';
       logger.log(sessionId + ': Got DOWNLOAD_FINISHED with status : ' + status);
       if (msg.sizes) {
@@ -2944,7 +2941,6 @@ io.on('connection', function (socket) {
   socket.on('tool_download_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
       logger.log(sessionId + ': Got TOOL_DOWNLOAD_FINISHED with status : ' + status);
@@ -2968,7 +2964,6 @@ io.on('connection', function (socket) {
   socket.on('data_download_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
       logger.log(sessionId + ': Got DATA_DOWNLOAD_FINISHED with status : ' + status);
@@ -2992,7 +2987,6 @@ io.on('connection', function (socket) {
   socket.on('execute_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
       var cancelled = msg.cancelled || '';
@@ -3017,7 +3011,6 @@ io.on('connection', function (socket) {
   socket.on('upload_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
       logger.log(sessionId + ': Got UPLOAD_FINISHED with status : ' + status);
@@ -3052,7 +3045,6 @@ io.on('connection', function (socket) {
   socket.on('data_pull_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
       var message = msg.message || '';
@@ -3093,7 +3085,6 @@ io.on('connection', function (socket) {
   socket.on('data_push_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
       var message = msg.message || '';
@@ -3139,7 +3130,6 @@ io.on('connection', function (socket) {
   socket.on('cleanup_finished', function (data) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
-      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
       logger.log(sessionId + ': Got CLEANUP_FINISHED with status : ' + status);
@@ -3165,7 +3155,6 @@ io.on('connection', function (socket) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
 
-      //var APIversion = msg.APIversion || '1.0';
       var sessionId = msg.sessionId || '';
       var status = msg.status || '';
       var masterTicket = msg.ticket || null;
@@ -3191,7 +3180,6 @@ io.on('connection', function (socket) {
     if (nt.isSafeJSON(data)) {
       var msg = JSON.parse(data);
 
-      //var APIversion = msg.APIversion || '1.0';
       var instanceId = msg.instanceId || '';
       logger.log('Got HELLO from master: ' + instanceId);
       var myticket = getTicketIdByInstanceId(instanceId);
@@ -3769,7 +3757,6 @@ function handleInitialized(socket, sessionId, ticket, msg) {
   var reqID = Tickets[ticket].id;
   var masterTicket = dupTicket(reqID);
   var mesg;
-  var APIversion = msg.APIversion || '1.0';
 
   Tickets[ticket].set('sessionStatus', 'downloadData');
   var runas = Tickets[ticket].getRequest('runas');
@@ -3781,17 +3768,8 @@ function handleInitialized(socket, sessionId, ticket, msg) {
     'ticket' : masterTicket
   };
   mesg['homeBlacklistPatterns'] = homeBlacklistPatterns;
-  switch (APIversion) {
-    case '1.0' :
-      logger.log(sessionId + ': SENT DOWNLOAD DATA');
-      socket.emit('data_download', JSON.stringify(mesg), parseAck);
-      break;
-    case '1.1' :
-    default :
-      logger.log(sessionId + ': SENT DOWNLOAD');
-      socket.emit('download', JSON.stringify(mesg), parseAck);
-      break;
-  }
+  logger.log(sessionId + ': SENT DOWNLOAD');
+  socket.emit('download', JSON.stringify(mesg), parseAck);
 }
 
 function handleHello(socket, instanceId, ticket, msg) {
