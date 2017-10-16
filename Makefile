@@ -3,7 +3,7 @@ all:
 clean: node_modules
 	rm -rf node_modules
 
-SRC_FILES = api.js hub.js sqlTemplates.js lib/*.js nef.js nef-com.js nef-hub.js
+SRC_FILES = hub.js sqlTemplates.js lib/*.js nef.js nef-com.js nef-hub.js
 OTHER_FILES = package.json startup.sh nefelus-hub.conf
 CONFIGS = hub.conf.in nefelus.conf.in
 JX_FILES = hub.jxp nef.jxp nef-com.jxp nef-hub.jxp
