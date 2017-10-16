@@ -7,21 +7,34 @@
 # If set to "ami" then the machine is supposed to be used for VM image creation.
 hubType = "production"
 
+# host : the hostname or IP address where the service will listen for incomming connections. Defaults to localhost
 host = "hub.example.com"
+# port : the port where the service will listen for incomming connections. Defaults to 8585
 port = 8585
 
+# filemanager: the endpoint of nefelus-s3 service
 filemanager = "https://hub.example.com:8888"
 
+# maxRunningJobsAllowed : default value for maximum number of allowed sessions system wide.
+# Related to the number of available IP addresses for worker VMs or max number of machines allowed by Cloud Provider.
 maxRunningJobsAllowed = 10
+# hasAutoAssignFloatingIp : flag if the cloud stack assigns an IP address to the launching VM.
 hasAutoAssignFloatingIp : false
+
 skipCycles = 8
 cancelHours = 0
 forceCancelHours = 0
 
+# setloginuser : By default the user running the tools in a worker VM is 'nefelus'.
+# By setting setloginuser to true, the user running the tools is set to the username launching the tool from the Web FrontEnd.
 setloginuser = true
 setsecgroups = false
+# vncLocalOnly : Control if for GUI interactive tools access to the machine is allowed by third party VNC clients or
+# if access is allowed only via noVNC web client installed locally.
 vncLocalOnly = false
 
+# masterScripts: path to filename or false.
+# It is used for debuging VM startup scripts
 masterScripts = false
 
 [aws]
@@ -37,12 +50,18 @@ domainName = "cdc-lab.com"
 # database config is normally set in nefelus.conf
 # values here overide default ones.
 [database]
+#queryinterval: it is used to set the polling intervals to check if there are pending jobs
 queryinterval = 15000
 
+# Static user data are passed verbatim to the VM
 [staticUserData]
+#timezone: a valid timezone for example: "Asia/Tokyo", "Europe/Athens", UTC etc
 TIMEZONE = "UTC"
+# makeswapfile: controls if the VM on startup will create a swap file, usefull for VMs with small RAM
 MAKESWAPFILE = "NO"
+#stunnel: controls if the stunnel will be the SSL endpoint instead of the local daemons
 STUNNEL = "YES"
+# Logos used for branding the noVNC desktop
 "LOGO_BIG.png" = "https://www.example.com/nefelus.png"
 "LOGO_SMALL.png" = "https://www.example.com/nefelus_small.png"
 "LOGO_NEFELUS_BIG.png" = "https://www.example.com/nefelus.png"
