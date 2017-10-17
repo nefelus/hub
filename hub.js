@@ -2832,7 +2832,7 @@ io.on('connection', function (socket) {
         logURL = (logURL != '') ?  logURLproto + '://' + logURL + ':' + logURLport + '?token=' + Tickets[myticket].get('uuid') : '';
 
         if (jobType == 'interactive') {
-          var vncURLargs = '?password=' + Tickets[myticket].get('uuid') + '&title=Nefelus%20-%20' + (sessionId.split('_')[4] || 'VNC.Console');
+          var vncURLargs = '?autoconnect=true&password=' + Tickets[myticket].get('uuid') + '&title=Nefelus%20-%20' + (sessionId.split('_')[4] || 'VNC.Console');
           vncURLargs += (noVNCdebug === true) ? '&logging=debug' : '';
           vncURL = (vncURL != '') ?  vncURLproto + '://' + vncURL + ':' + vncURLport + vncURLargs : '';
         } else if (jobType == 'prompt') {
