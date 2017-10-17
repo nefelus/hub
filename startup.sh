@@ -5,10 +5,7 @@ sourceDir=/usr/share/nefelus/hub
 
 cd $sourceDir
 
-if [ -e hub.jx ]; then
-  exe=hub.jx
-  launcher=/usr/local/bin/jx
-elif [ -e hub.js ]; then
+if [ -e hub.js ]; then
   exe=hub.js
   launcher=node
 elif [[ -e hub.sh && -e hub ]]; then

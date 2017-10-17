@@ -94,7 +94,7 @@ program
 
 var myshell = path.basename(process.argv[0]);
 
-if ((myshell !== 'node') && (myshell !== 'jx')) {
+if (myshell !== 'node') {
   process.argv.unshift(myshell);
 }
 
@@ -127,14 +127,13 @@ function callHub(program, cmd, options) {
 }
 
 function hubSetup(program) {
-  var isJX = (path.basename(process.argv[0]) === 'jx');
   var isPkg = (process.versions.pkg !== undefined);
 
   var exepath;
 
   if (isPkg) {
     exepath = process.argv[0];
-  } else if ((path.basename(process.argv[0]) === 'node') || (isJX)) {
+  } else if ((path.basename(process.argv[0]) === 'node')) {
     exepath = process.argv[1];
   } else {
     exepath = process.argv[0];
