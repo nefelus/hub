@@ -32,7 +32,7 @@ program
 
 var myshell = path.basename(process.argv[0]);
 
-if ((myshell !== 'node') && (myshell !== 'jx')) {
+if (myshell !== 'node') {
   process.argv.unshift(myshell);
 }
 

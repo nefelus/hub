@@ -6,7 +6,6 @@ clean: node_modules
 SRC_FILES = hub.js sqlTemplates.js lib/*.js nef.js nef-com.js nef-hub.js
 OTHER_FILES = package.json startup.sh nefelus-hub.conf
 CONFIGS = hub.conf.in nefelus.conf.in
-JX_FILES = hub.jxp nef.jxp nef-com.jxp nef-hub.jxp
 
 OBFUSCATOR_PARAMS = --disableConsoleOutput false --selfDefending true --stringArray true --stringArrayEncoding base64 --stringArrayThreshold 0.75 --debugProtection true --debugProtectionInterval false --controlFlowFlattening true --controlFlowFlatteningThreshold 0.75
 
@@ -47,21 +46,5 @@ dist: distclean
 
 distclean:
 	rm -rf dist
-
-jxdist: jxdistclean
-	mkdir -p jxdist/hub/lib
-	for f in $(SRC_FILES); do \
-		uglifyjs $$f -m -o jxdist/hub/$$f; \
-	done;
-	cp $(JX_FILES) $(CONFIGS) $(OTHER_FILES) jxdist/hub
-	for f in $(CONFIGS); do \
-		cp "$$f" jxdist/hub/$$f; \
-	done;
-	(cd jxdist/hub; jx compile nef.jxp ; jx compile nef-com.jxp ; jx compile nef-hub.jxp )
-	(cd jxdist/hub; jx compile hub.jxp; mkdir -p node_modules; rm -f $(SRC_FILES) $(JX_FILES) ; rm -rf lib ; )
-	(cd jxdist; tar zcf hub.tgz hub)
-
-jxdistclean:
-	rm -rf jxdist
 
 .PHONY: all

@@ -68,7 +68,6 @@ var toolapps = require('./lib/toolapps');
 var machines = require('./lib/machines');
 var _nslm = require('./lib/nslmlib');
 
-var isJX = (path.basename(process.argv[0]) === 'jx');
 var isPkg = (process.versions.pkg !== undefined);
 
 var exepath;
@@ -77,7 +76,7 @@ var myargs;
 if (isPkg) {
   exepath = process.argv[0];
   myargs = process.argv.slice(2);
-} else if ((path.basename(process.argv[0]) === 'node') || (isJX)) {
+} else if ((path.basename(process.argv[0]) === 'node')) {
   exepath = process.argv[1];
   myargs = process.argv.slice(2);
 } else {
