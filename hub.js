@@ -1878,19 +1878,6 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
   );
 }
 
-function oldTerminateMachines(machines, cb) {
-  var args = {
-    InstanceIds : []
-  };
-
-  if ((typeof machines === 'string') && (machines.length > 0)) {
-    args.InstanceIds.push(machines);
-  } else if ((_.isArray(machines))  && (machines.length > 0)) {
-    args.InstanceIds = machines;
-  }
-  ec2.terminateInstances(args, cb);
-}
-
 function KillMachines(machines, cb) {
   function _TerminateMachines(callback, results) {
     TerminateMachines(machines, function(err, data) {
