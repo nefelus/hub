@@ -455,9 +455,13 @@ function loadConfig() {
     if (typeof _ep === 'string') {
       endpoint = _ep;
     } else {
-      var epproto = _ep.protocol || 'http';
-      var epport = ((_ep.port == 80) && (epproto == 'http')) ? '' : (((_ep.port == 443) && (epproto == 'https')) ? '' : ':'+_ep.port);
-      endpoint = epproto + '://'+ _ep.host + epport+ (_ep.path || '/');
+      if (typeof _ep.url === 'string') {
+        endpoint = _ep.url;
+      } else {
+        var epproto = _ep.protocol || 'http';
+        var epport = ((_ep.port == 80) && (epproto == 'http')) ? '' : (((_ep.port == 443) && (epproto == 'https')) ? '' : ':'+_ep.port);
+        endpoint = epproto + '://'+ _ep.host + epport+ (_ep.path || '/');
+      }
     }
 
     ep = new AWS.Endpoint(endpoint);
