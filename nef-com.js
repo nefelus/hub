@@ -726,9 +726,14 @@ function awsSetup(program) {
     ep = new AWS.Endpoint(program.apiEndpoint);
   } else if ((aws.ec2.endpoint) && (! nt.isEmpty(aws.ec2.endpoint))) {
     var _ep = aws.ec2.endpoint;
-    var epproto = _ep.protocol || 'http';
-    var epport = ((_ep.port == 80) && (epproto == 'http')) ? '' : (((_ep.port == 443) && (epproto == 'https')) ? '' : ':'+_ep.port);
-    var endpoint = epproto + '://'+ _ep.host + epport+ (_ep.path || '/');
+    var endpoint;
+    if (typeof _ep.url === 'string') {
+      endpoint = _ep.url;
+    } else {
+      var epproto = _ep.protocol || 'http';
+      var epport = ((_ep.port == 80) && (epproto == 'http')) ? '' : (((_ep.port == 443) && (epproto == 'https')) ? '' : ':'+_ep.port);
+      endpoint = epproto + '://'+ _ep.host + epport+ (_ep.path || '/');
+    }
 
     ep = new AWS.Endpoint(endpoint);
   }
