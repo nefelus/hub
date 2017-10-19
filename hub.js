@@ -207,13 +207,8 @@ var nslmSessionIsActive = NSLM_BYPASS; // If we bypass license checking, it perm
 
 loadConfig();
 
-//process.on('uncaughtException', function(err) {
-  //logger.log('UNCAUGHT EXCEPTION!!!');
-  //logger.log(util.inspect(err, { showHidden: true, depth: null }));
-//});
-
 function mayIExit() {
-  if ((lmDispatcherIsRunning === false) && (dispatcherIsRunning === false)) {
+  if (dispatcherIsRunning === false) {
     logger.log('See you later aligator...');
     process.exit();
   }
@@ -1050,7 +1045,6 @@ function TerminateSession(sessionId) {
     instance = t.getMaster('instanceId');
     instances.push(instance);
 
-    //TerminateMachines(instances, function (err, data) {} // FIXME : DELETE
     KillMachines(instances, function (err, data) {
       if (err) {
         logger.log(sessionId + ': Failed to terminate some of the machines ' + instances.join());
@@ -1085,7 +1079,6 @@ function forceRestartMaster(instanceId, sessionId) {
     if (ticket.healthCheckTimer != null) {
       clearInterval(ticket.healthCheckTimer);
     }
-    // TerminateMachines(instanceId, function (err, data) {} // FIXME : DELETE
     KillMachines(instanceId, function (err, data) {
       if (err) {
         logger.log(sessionId + ': Failed to terminate instance ' + instanceId);
@@ -1134,10 +1127,8 @@ function deactivateNFSSharesOfOldInstances() {
           };
           var activeInstances=[];
           ec2.describeInstances(args, function(err, data) {
-            //console.log(util.inspect(data, {depth: null}));
             for (var i=0; i<data.Reservations.length; i++) {
               for (var j=0; j<data.Reservations[i].Instances.length; j++) {
-                //console.log(data.Reservations[i].Instances[j].InstanceId);
                 activeInstances.push(data.Reservations[i].Instances[j].InstanceId);
               }
             }
@@ -1621,10 +1612,6 @@ function startMaster(ticket, cb) {
                 return;
               }
 
-              //var _enckey = ticket.req.ami + ticket.req.machineSpeed + ticket.req.sessionId + '\n';
-              //var md5sum = crypto.createHash('md5');
-              //var enckey = md5sum.update(_enckey).digest('hex');
-
               var denckey = nt.mkKey('sha256', [ ticket.req.ami, ticket.req.machineSpeed, ticket.req.sessionId]);
               var enckey = nt.mkKey('sha256', [ ticket.req.ami, ticket.req.machineSpeed]);
 
@@ -1672,21 +1659,6 @@ function startMaster(ticket, cb) {
                           logger.log('Failed to start instance for ' + ticket.req.sessionId);
                           cb(err, null);
                         } else {
-/*
-                          if (data) {
-                            getMachinesInfo(data, function(err, data) {
-                              if (err) {
-                                logger.log('Failed to get machine info for ' + ticket.req.sessionId);
-                                cb(err, null);
-                              } else {
-                                ticket.machineStarted = new Date();
-                                cb(null, data);
-                              }
-                            });
-                          } else {
-                            cb(null, null);
-                          }
-*/
                           if (data) {
 
                             async.each(data, function(item, callback) {
@@ -2205,53 +2177,8 @@ var parseAck = function(ack) {
 
 mystate = 'on';
 
-var lmDispatcherIsRunning = false;
-var lmDispatcher = function lmDispatcher() {
-  if (lmDispatcherIsRunning) {
-    return;
-  }
-  lmDispatcherIsRunning = true;
-  //var now = nt.getDateTimeNow(true, false);
-  var query = 'SELECT * FROM atable';
-  if (mysqlPool !== null) {
-    mysqlPool.getConnection(function(err, mysqlClient) {
-      if (err) {
-        logger.log(err);
-        lmDispatcherIsRunning = false;
-        return;
-      }
-
-      mysqlClient.query(query, function(err, rows, fields) {
-
-        if (err) {
-          logger.log('Error from MYSQL query:');
-          logger.log(err);
-          lmDispatcherIsRunning = false;
-          mysqlClient.release();
-          return;
-        }
-
-        var records = [];
-        var i, j, record;
-        for (i = 0; i < rows.length; i++) {
-          record = {};
-          for (j = 0; j < fields.length; j++) {
-            //if (fields[j].name == 'STATUS') {
-            //}
-            record[fields[j].name] = rows[i][fields[j].name];
-          }
-          records.push(record);
-        }
-        mysqlClient.release();
-      });
-    });
-  }
-  lmDispatcherIsRunning = false;
-};
-
 var dispatcherIsRunning = false;
 var dispatcher = function dispatcher () {
-  //SELECT * from HUB_REQUEST where status in ('PENDING', 'SETUP', 'RUNNING');
   if (dispatcherIsRunning) {
     return;
   }
@@ -3364,18 +3291,6 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
 
   var sid = nt.parseSessionId(sessionId);
 
-  //SELECT us.ID as ID,
-  //       up.BLOCK as blockname,
-  //       up.NAME as projectname,
-  //       ul.FIRST_NAME as firstname,
-  //       concat(concat(ul.FIRST_NAME, ' '), ul.LAST_NAME) as fullname,
-  //       ul.EMAIL as email,
-  //       hr.STARTED as started,
-  //       hr.COMPL_TARGET as completed,
-  //       hr.STATUS as status,
-  //       ta.NAME as toolname
-  //       FROM TOOL_APPS as ta, HUB_REQUEST as hr, USER_SESSION as us, USER_PROJECT as up, USER_LOGIN as ul
-  //       WHERE us.TASK_ID = ? and ul.ID = ? and up.ID = ? and us.USER_ID=ul.ID and hr.ID = ? and ta.ID = ?;
   var emailqueryparams = [];
 
   emailqueryparams.push(sid.taskId);
