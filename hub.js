@@ -3733,7 +3733,7 @@ function handleHello(socket, instanceId, ticket, msg) {
     if (Tickets[ticket].get('XDisplay')) {
       mesg['XDisplay'] = Tickets[ticket].get('XDisplay');
     }
-    logger.log(sessionId + ': ' + servername + ' ' + uuid);
+    logger.log(sessionId + ': servername: ' + servername + ' uuid: ' + uuid);
     if (servername !== '') {
       if (reqID !== null) {
         mysqlKeys = ['SERVERNAME'];
