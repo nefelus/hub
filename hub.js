@@ -1212,7 +1212,7 @@ function activateNFSShares(instanceId, sessionId) {
 
               request(options, function(error, response, body) {
                 if (error) {
-                  logger.log(sessionId + 'ERROR sending activateNFSshares request to filemanager.');
+                  logger.log(sessionId + ': ERROR sending activateNFSshares request to filemanager.');
                   logger.log(util.inspect(error, {depth:null}));
                 } else {
                   if ((String(response.statusCode) !== '200') || ((String(response.statusCode) === '200') && (body.status === 'error'))) {
@@ -1261,11 +1261,11 @@ function deactivateNFSShares(instanceId) {
 
       request.get(options, function(error, response, body) {
         if (error) {
-          logger.log(sessionId + 'ERROR sending deactivateNFSshares request to filemanager.');
+          logger.log(sessionId + ': ERROR sending deactivateNFSshares request to filemanager.');
           logger.log(util.inspect(error, {depth:null}));
         } else {
           if (String(response.statusCode) !== '200') {
-            logger.log(sessionId + 'ERROR getting deactivateNFSshares response from filemanager. ('+response.statusCode+')');
+            logger.log(sessionId + ': ERROR getting deactivateNFSshares response from filemanager. ('+response.statusCode+')');
             logger.log(util.inspect(body, {depth:null}));
           } else {
             ticket.setDynamicNFSShare('deactivated', true);
@@ -3547,6 +3547,11 @@ function handleUploadFinished(socket, sessionId, ticket, msg) {
   var status = msg.status || '';
   var message = msg.message || '';
 
+  var instanceId = Tickets[ticket].getMaster('instanceId');
+  if (useDynamicNFSShares === true) {
+    deactivateNFSShares(instanceId);
+  }
+
   Tickets[ticket].set('sessionStatus', 'cleanup');
 
   if (status !== 'error') {
@@ -3686,9 +3691,6 @@ function handleHello(socket, instanceId, ticket, msg) {
 
 
   if (sessionId !== null) {
-    if (useDynamicNFSShares === true) {
-      deactivateNFSShares(instanceId);
-    }
     var jobType = Tickets[ticket].getRequest('jobType') || 'batch';
     if (Tickets[ticket].healthCheckTimer) {
       clearInterval(Tickets[ticket].healthCheckTimer);
