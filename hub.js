@@ -185,7 +185,6 @@ var noVNCdebug;
 var x11IdleTimeout;
 var homeBlacklistPatterns = [];
 var emailTemplates;
-var MAX_RUNNING_JOBS_ALLOWED;
 var db;
 var timerID = null;
 var masterDebug = false;
@@ -541,8 +540,6 @@ function loadConfig() {
   }
   adminEmail = mainconf.get('adminEmail');
   masterDebug = mainconf.get('vm:masterDebug') || false;
-  MAX_RUNNING_JOBS_ALLOWED = mainconf.get('maxRunningJobsAllowed') || 0;
-  MAX_RUNNING_JOBS_ALLOWED = Number(MAX_RUNNING_JOBS_ALLOWED);
   db = mainconf.get('database');
   hubType = mainconf.get('hubType') || 'production';
   mysqlConfig = {
@@ -2255,7 +2252,8 @@ var dispatcher = function dispatcher () {
                                          u : rows[i]['USER_ID'] || 0,
                                          p : rows[i]['PROJECT_ID'] || 0,
                                          t : rows[i]['TOOL_ID'] || 0,
-                                         m : machineId});
+                                         m : machineId,
+                                         s : machines.getCloudId(machineId)});
                 } else {
                   logger.log('ERROR: MACHINE_ID found 0 or NULL. #' + rows[i]['ID']);
                 }
@@ -2273,7 +2271,8 @@ var dispatcher = function dispatcher () {
                                    rows[i]['USER_ID'] || 0,
                                    rows[i]['PROJECT_ID'] || 0,
                                    rows[i]['TOOL_ID'] || 0,
-                                   machineId);
+                                   machineId,
+                                   machines.getCloudId(machineId));
                 } else {
                   logger.log('ERROR: MACHINE_ID found 0 or NULL. #' + rows[i]['ID']);
                 }
@@ -2292,7 +2291,7 @@ var dispatcher = function dispatcher () {
           }
         }
 
-        quotas.loadQueueQuotas(mysqlClient, pendingSessions, MAX_RUNNING_JOBS_ALLOWED, function(err, queueQuotaData){
+        quotas.loadQueueQuotas(mysqlClient, pendingSessions, function(err, queueQuotaData){
           if (err === null) {
 
             machineId = 0;
@@ -2363,7 +2362,6 @@ var dispatcher = function dispatcher () {
                         records[isCancelPending.index].STATUS = 'ENDED';
                       } else {
                         if (nslmSessionIsActive) {
-                          logger.log('Total running=' + totalRunningFound + ' MAX ALLOWED=' + quotas.limits.resolveLimits({}));
                           isSessionActive = getTicketIdBySessionId(records[i].SESSION_ID);
                           var currentSid = nt.parseSessionId(records[i].SESSION_ID);
                           var runOrNot = false;
@@ -2385,15 +2383,14 @@ var dispatcher = function dispatcher () {
                             if (scheduled - justnow <= 0 ) {
 
                               machineId = records[i].MACHINE_ID || 0;
+                              logger.log('Total running=' + totalRunningFound + ' MAX ALLOWED=' + quotas.limits.resolveLimits({cloud: machines.getCloudId(machineId)}));
                               var machineType = machines.getSpeed(machineId);
                               if ((! machines.exists(machineId)) || (machineId === 0)) {
                                 logger.log('WARNING: Undefined machine '+machineType+' '+machineId);
                                 machineType = '';
                               } else {
-                                runOrNot = quotas.checkQueueQuota(currentSid.companyId, currentSid.clientId, currentSid.projectId, currentSid.toolId, machineId, false, 1);
+                                runOrNot = quotas.checkQueueQuota(currentSid.companyId, currentSid.clientId, currentSid.projectId, currentSid.toolId, machineId, machines.getCloudId(machineId), false, 1);
                               }
-
-                              //FIXME: //if ((totalRunningFound < quotas.limits.resolveLimits({})) || (MAX_RUNNING_JOBS_ALLOWED == 0)) {}
 
                               if (runOrNot === true) {
                                 if (isSessionActive == null) {
@@ -2450,7 +2447,7 @@ var dispatcher = function dispatcher () {
 
                                       updateStatus(mysqlPool, hubreqid, 'SETUP', ['QUEUE_INFO'], ['']);
                                       // Add Stats here and do not wait until machine is started!
-                                      quotas.stats.add(companyId || 0, userId || 0, projectId || 0, toolId || 0, machineId);
+                                      quotas.stats.add(companyId || 0, userId || 0, projectId || 0, toolId || 0, machineId, machines.getCloudId(machineId));
 
                                       startMaster(t, function(err, data) {
                                         var mysqlKeys;
@@ -3866,26 +3863,9 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, cb) {
                       } else {
                         callback(null, machineData, imageData, cloudData, toolappsData, 'No need to reload secgroups');
                       }
-                    },
-                    function(machineData, imageData, cloudData, toolappsData, secgroupsData, callback) {
-                      if ((lastUpdatedConfig['QUOTA_SESSIONS']) && (lastUpdatedConfig['QUOTA_SESSIONS']['reload'])) {
-                        quotas.loadMaxSessionsAllowed(mysqlClient, MAX_RUNNING_JOBS_ALLOWED, function(err, maxsessionsData) {
-                          err && logger.log('Quota_Sessions', err);
-                          if (! err) {
-                            logger.log('Max Sessions =',maxsessionsData);
-                            MAX_RUNNING_JOBS_ALLOWED = maxsessionsData;
-                            var nowDate = new Date();
-                            lastUpdatedConfig['QUOTA_SESSIONS']['timestamp'] = Number(nowDate.valueOf());
-                            lastUpdatedConfig['QUOTA_SESSIONS']['reload'] = false;
-                          }
-                          callback(err, machineData, imageData, cloudData, toolappsData, secgroupsData, maxsessionsData);
-                        });
-                      } else {
-                        callback(null, machineData, imageData, cloudData, toolappsData, secgroupsData, 'No need to reload maxsessions');
-                      }
                     }
                   ],
-                  function(err, machineData, imageData, cloudData, toolappsData, secgroupsData, maxsessionsData) {
+                  function(err, machineData, imageData, cloudData, toolappsData, secgroupsData) {
                     if (err) {
                       logger.log('Loading from MySQL failed, will retry shortly...');
                       setTimeout(function() { callback(err, {'1' : machineData || null,
@@ -3893,7 +3873,6 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, cb) {
                                                              '3' : cloudData || null,
                                                              '4' : toolappsData || null,
                                                              '5' : secgroupsData || null,
-                                                             '6' : maxsessionsData || null
                                                             }); }, DBTIMEOUT);
                     } else {
                       logger.log('Loading from MySQL completed');
@@ -3901,8 +3880,7 @@ function loadMySQLParams(mysqlClient, lastUpdatedConfig, cb) {
                                      'images' : imageData || null,
                                      'clouds' : cloudData || null,
                                      'toolapps' : toolappsData || null,
-                                     'secgroups' : secgroupsData || null,
-                                     'maxsessions' : maxsessionsData || null
+                                     'secgroups' : secgroupsData || null
                                     });
                     }
                   }

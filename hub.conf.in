@@ -15,9 +15,6 @@ port = 8585
 # filemanager: the endpoint of nefelus-s3 service
 filemanager = "https://hub.example.com:8888"
 
-# maxRunningJobsAllowed : default value for maximum number of allowed sessions system wide.
-# Related to the number of available IP addresses for worker VMs or max number of machines allowed by Cloud Provider.
-maxRunningJobsAllowed = 10
 # hasAutoAssignFloatingIp : flag if the cloud stack assigns an IP address to the launching VM.
 hasAutoAssignFloatingIp : false
 
