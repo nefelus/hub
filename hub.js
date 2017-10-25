@@ -1799,8 +1799,10 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
             ready = true;
             noResources = true;
             logger.log('RunInstances: ' + ((err.message) ? err.message : 'unknown error'));
+            callback(null);
           } else {
             logger.log('RunInstances error ', JSON.stringify(err));
+            setTimeout(function() {callback(null);}, EC2_TIMEOUT);
           }
         } else {
           if (data.Instances) {
@@ -1810,10 +1812,12 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
                 ready = true;
               }
             }
+          } else {
+            noResources = true;
           }
+          callback(null);
         }
       });
-      setTimeout(callback, EC2_TIMEOUT);
     },
     function (err) {
       if (ready) {
@@ -1941,9 +1945,11 @@ function getMachinesInfo(machines, cb) {
               machinesInfo.push(mi);
             }
           }
+          callback(null);
+        } else {
+          setTimeout(function() {callback(null);}, EC2_TIMEOUT);
         }
       });
-      setTimeout(callback, EC2_TIMEOUT);
     },
     function (err) {
       if (machinesFound == machineCount) {
@@ -1999,9 +2005,11 @@ function associateNextFreeAddress(instanceId, auto, cb) {
           ec2.associateAddress(args, function(err, data) {
             if (! err) {
               addressAssociated = true;
+              callback(null);
+            } else {
+              setTimeout(function() {callback(null);}, EC2_TIMEOUT);
             }
           });
-          setTimeout(callback, EC2_TIMEOUT);
         },
         function (err) {
           if (addressAssociated === true) {
@@ -2038,9 +2046,11 @@ function getFreeAddress(cb) {
               address = x.PublicIp;
             }
           }
+          callback(null);
+        } else {
+          setTimeout(function() {callback(null);}, EC2_TIMEOUT);
         }
       });
-      setTimeout(callback, EC2_TIMEOUT);
     },
     function (err) {
       cb (((addressFound === true) ? null : 'Error or incomplete response'), address);
