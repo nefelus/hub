@@ -1,7 +1,7 @@
 {
   "name": "nefelus-hub",
   "description": "Nefelus HUB",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "dependencies": {
     "archiver": "~2.1.0",
     "async": "~1.5.2",
