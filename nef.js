@@ -4,7 +4,6 @@
 //
 var program = require('commander');
 var path = require('path');
-var env = process.env;
 
 program
   .version('0.0.1')
@@ -38,29 +37,7 @@ if (myshell !== 'node') {
 
 //console.log(process.argv);
 
-var myname=process.argv[1];
 program.parse(process.argv);
 
 //console.log(program);
 if (!program.args.length) program.help();
-
-function range(val) {
-  return val.split('..').map(Number);
-}
-
-function listNum(val) {
-  return val.split(',').map(Number);
-}
-
-function list(val) {
-  return val.split(',');
-}
-
-function collect(val, memo) {
-  memo.push(val);
-  return memo;
-}
-
-function increaseVerbosity(v, total) {
-  return total + 1;
-}

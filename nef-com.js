@@ -11,14 +11,11 @@ var toml = require('toml');
 var nconf = require('nconf');
 var AWS = require('aws-sdk');
 var mysql = require('mysql');
-var SQL = require('./sqlTemplates').sqlTemplates;
 var _ = require('lodash');
 var Table = require('cli-table2');
-var env = process.env;
 var nt = require(path.join(__dirname, './lib/tools'));
 var ec2;
 var ep = null;
-var myname;
 var mysqlPool = null;
 var mysqlConfig = null;
 
@@ -621,21 +618,21 @@ function dbSetup(program) {
     if (nt.isReadableSync(db.sslkey)) {
       dbSSLkey = fs.readFileSync(db.sslkey);
     } else {
-      logger.log('Warning: file '+db.sslkey+' is not readable.');
+      console.log('Warning: file '+db.sslkey+' is not readable.');
     }
   }
   if ((db.sslcert) && (db.sslcert !== '')) {
     if (nt.isReadableSync(db.sslcert)) {
       dbSSLcert = fs.readFileSync(db.sslcert);
     } else {
-      logger.log('Warning: file '+db.sslcert+' is not readable.');
+      console.log('Warning: file '+db.sslcert+' is not readable.');
     }
   }
   if ((db.sslca) && (db.sslca !== '')) {
     if (nt.isReadableSync(db.sslca)) {
       dbSSLca = fs.readFileSync(db.sslca);
     } else {
-      logger.log('Warning: file '+db.sslca+' is not readable.');
+      console.log('Warning: file '+db.sslca+' is not readable.');
     }
   }
   if ((dbSSLkey !== '') || (dbSSLcert !== '') || (dbSSLca !== '')) {
@@ -748,14 +745,6 @@ function awsSetup(program) {
   ec2 = new AWS.EC2(EC2Params);
 }
 
-function range(val) {
-  return val.split('..').map(Number);
-}
-
-function listNum(val) {
-  return val.split(',').map(Number);
-}
-
 function listOfInts(val) {
   var ints = [];
   val.split(',').forEach(function(v) {
@@ -768,15 +757,6 @@ function listOfInts(val) {
 
 function list(val) {
   return val.split(',');
-}
-
-function collect(val, memo) {
-  memo.push(val);
-  return memo;
-}
-
-function increaseVerbosity(v, total) {
-  return total + 1;
 }
 
 function KillMachines(machines, cb) {

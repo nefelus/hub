@@ -5,13 +5,12 @@
 var program = require('commander');
 var path = require('path');
 var fs = require('fs');
+var util = require('util');
 var toml = require('toml');
 var nconf = require('nconf');
 var io = require('socket.io-client');
 var _ = require('lodash');
-var env = process.env;
 var nt = require(path.join(__dirname, './lib/tools'));
-var myname;
 var socket = null;
 var hubServer = null;
 
@@ -29,7 +28,7 @@ program
    .command('pause')
    .description('pause queue')
    .action(function(){
-     callHub(program, "pause");
+     callHub(program, 'pause');
      hubSetup(program);
    }).on('--help', function() {
     console.log('  Examples:');
@@ -40,7 +39,7 @@ program
    .command('resume')
    .description('resume queue')
    .action(function(){
-     callHub(program, "resume");
+     callHub(program, 'resume');
      hubSetup(program);
    }).on('--help', function() {
     console.log('  Examples:');
@@ -51,7 +50,7 @@ program
    .command('status')
    .description('show queue status')
    .action(function(){
-     callHub(program, "status");
+     callHub(program, 'status');
      hubSetup(program);
    }).on('--help', function() {
     console.log('  Examples:');
@@ -62,7 +61,7 @@ program
    .command('shutdown')
    .description('shutdown hub server')
    .action(function(){
-     callHub(program, "shutdown");
+     callHub(program, 'shutdown');
      hubSetup(program);
    }).on('--help', function() {
     console.log('  Examples:');
@@ -73,7 +72,7 @@ program
    .command('interval <interv>')
    .description('set queue check interval')
    .action(function(interv){
-     callHub(program, "interval", interv);
+     callHub(program, 'interval', interv);
      hubSetup(program);
    }).on('--help', function() {
     console.log('  Examples:');
@@ -85,7 +84,7 @@ program
    .alias('sessions')
    .description('show sessions')
    .action(function(){
-     callHub(program, "showsessions");
+     callHub(program, 'showsessions');
      hubSetup(program);
    }).on('--help', function() {
     console.log('  Examples:');
@@ -100,7 +99,6 @@ if (myshell !== 'node') {
 
 //console.log(process.argv);
 
-myname=process.argv[1];
 program.parse(process.argv);
 
 //console.log(program);
@@ -113,12 +111,12 @@ function callHub(program, cmd, options) {
   }
   hubSetup(program);
   switch (cmd) {
-    case "interval" : 
-    case "status" : 
-    case "pause" : 
-    case "resume" : 
-    case "shutdown" : 
-    case "showsessions" : 
+    case 'interval' : 
+    case 'status' : 
+    case 'pause' : 
+    case 'resume' : 
+    case 'shutdown' : 
+    case 'showsessions' : 
       _callHub(cmd, [hubopts]);
       break;
     default :
@@ -214,11 +212,13 @@ function _callHub(cmd, options) {
   };
   try {
     socket = io.connect(hubServer, hubOptions);
-  } catch(e) {};
+  } catch(e) {
+    // empty line
+  }
 
   var errorHandler = function errorHandler(error) {
     console.log('Received an error : '+util.inspect(error, {depth:null}) || 'no further info provided.');
-  }
+  };
 
   if (socket) {
     socket.on('connect_error', errorHandler);
@@ -262,25 +262,4 @@ function _callHub(cmd, options) {
       process.exit();
     });
   }
-}
-
-function range(val) {
-  return val.split('..').map(Number);
-}
-
-function listNum(val) {
-  return val.split(',').map(Number);
-}
-
-function list(val) {
-  return val.split(',');
-}
-
-function collect(val, memo) {
-  memo.push(val);
-  return memo;
-}
-
-function increaseVerbosity(v, total) {
-  return total + 1;
 }

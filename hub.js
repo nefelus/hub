@@ -50,9 +50,8 @@ var archiver   = require('archiver');
 
 var AWS = require('aws-sdk');
 
-var dns           = require('./lib/dns');
+var dns        = require('./lib/dns');
 var UUID       = require('uuid/v4');
-var exec       = require('child_process').exec;
 var tmp        = require('tmp');
 var moment     = require('moment-timezone');
 var timediff   = require('timediff');
@@ -141,7 +140,6 @@ tmp.setGracefulCleanup();
 var HEALTH_CHECK_INTERVAL = 30000; // 30 secs
 var CONSOLE_CHECK_INTERVAL = 5000; // 5 secs
 var CONSOLE_CHECK_MAX_TIMES = 60;  // 60 times * 5 secs = 5 minutes
-var env = process.env;
 
 var sslOptions = false;
 var sslMasterPack = false;
@@ -150,7 +148,6 @@ var installationId = '';
 var ignoreInstallationIdInFilemanagerOps = false;
 var aws;
 var awsParams = {};
-var awsAccountId;
 var r53info;
 var dnsPostprocess;
 
@@ -431,7 +428,6 @@ function loadConfig() {
     'secretAccessKey' : mainconf.get('aws:ec2:secretAccessKey'),
     'region' : mainconf.get('aws:ec2:region') || 'us-east-1'
   };
-  awsAccountId = mainconf.get('aws:ec2:accountId');
   dnsPostprocess = mainconf.get('aws:dnsPostprocess') || 'route53';
   r53info = mainconf.get('aws:route53') || null;
 
@@ -1120,7 +1116,7 @@ function deactivateNFSSharesOfOldInstances() {
             NFSinstances.push(rows[i]['INSTANCE_ID']);
           }
           var args = {
-            Filters : [ { Name : "instance-id", Values : NFSinstances }]
+            Filters : [ { Name : 'instance-id', Values : NFSinstances }]
           };
           var activeInstances=[];
           ec2.describeInstances(args, function(err, data) {
@@ -1180,7 +1176,7 @@ function activateNFSShares(instanceId, sessionId) {
                       'shares' : ticket.dynamicNFSShares.shares,
                       'ips' : ips
                     };
-      ips = ips.join(',')
+      ips = ips.join(',');
       ticket.dynamicNFSShares.shares.forEach(function (u) {
         vals.push([u.uuid, u.mount_params, ticket.master.instanceId, ips, 'Y']);
       });
@@ -1442,7 +1438,6 @@ function startMaster(ticket, cb) {
   } else {
     dataTypes = ['SHARED_DATA', 'USER_DATA', 'IP_DATA_LIB'];
   }
-  var Ids;
   var permittedResourcesFilters = [];
   dataTypes.forEach(function(dt) {
     permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype: dt, inherit:(dt !== 'USER_DATA')});
@@ -1476,7 +1471,7 @@ function startMaster(ticket, cb) {
 
       quotashares.getPermittedResources(mysqlClient, permittedResourcesFilters, function(err, data) {
         if (err) {
-          logger.log("ERROR: There was an error while fetching quotashares. Machine might launch without all external disks");
+          logger.log('ERROR: There was an error while fetching quotashares. Machine might launch without all external disks');
         }
         if (data) {
           for (var prkey in data) {
@@ -1490,7 +1485,7 @@ function startMaster(ticket, cb) {
         // Get shares in order to allow company admin to have write access to companies SHARED_DATA mounts.
         quotashares.getPermittedResources(mysqlClient, permittedResourcesFilters, function (err, admindata) {
           if (err) {
-            logger.log("ERROR: There was an error while fetching quotashares. Machine might launch without all external disks");
+            logger.log('ERROR: There was an error while fetching quotashares. Machine might launch without all external disks');
           }
           if (admindata) {
             adminIds = admindata['SHARED_DATA'] || [];
@@ -1635,7 +1630,7 @@ function startMaster(ticket, cb) {
                     var zdata;
                     header = '#NFUDPP2#';
                     if (err) {
-                      zdata = userDataStr;
+                      zdata = _userDataStr;
                       header = '#NFUDP';
                     } else {
                       zdata = encdata;
@@ -1704,7 +1699,7 @@ function startMaster(ticket, cb) {
                 });
               });
             } else {
-              logger.log("ERROR: There was an error while fetching shares. Machine might launch without external disks");
+              logger.log('ERROR: There was an error while fetching shares. Machine might launch without external disks');
             }
           });
         });
@@ -3331,13 +3326,13 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
             }
             if ((record.started) && (record.started !== '')) {
               var dts = moment( ((record.started).replace(/\//g, '-'))).tz(timezone);
-              record.started = dts.format("ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)");
+              record.started = dts.format('ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)');
             } else {
               record.started = 'N/A';
             }
             if ((record.completed) && (record.completed !== '')) {
               var dtc = moment( ((record.completed).replace(/\//g, '-'))).tz(timezone);
-              record.completed = dtc.format("ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)");
+              record.completed = dtc.format('ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)');
             } else {
               record.completed = 'N/A';
             }
@@ -3711,7 +3706,7 @@ function handleHello(socket, instanceId, ticket, msg) {
                       ec2_max_tries : EC2_MAX_TRIES,
                       ec2_timeout : EC2_TIMEOUT,
                       s3 : aws.s3
-                     }
+                     };
     aws2master.s3.endPoint = {};
     aws2master.s3.endPoint.endpoint = aws.s3.endpoint;
 
