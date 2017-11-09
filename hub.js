@@ -1423,6 +1423,7 @@ function startMaster(ticket, cb) {
   var toolXtermSupport = toolapps.getXtermSupport(sid.toolId);
   var toolMountPoint = toolapps.getMountPoint(sid.toolId);
   var toolAdditionalMountPoints = toolapps.getAdditionalMountPoints(sid.toolId);
+  var toolVendor = toolapps.getVendor(sid.toolId);
 
   if (toolMountPoint !== 0) {
     allIds.push(toolMountPoint);
@@ -1436,7 +1437,7 @@ function startMaster(ticket, cb) {
   if (nt.isSetSessionParam(ticket.req.sessionId, '4d')) { // Allow only documentation viewing.
     dataTypes = ['IP_DOCS', 'TOOL_DOCS'];
   } else {
-    dataTypes = ['SHARED_DATA', 'USER_DATA', 'IP_DATA_LIB'];
+    dataTypes = ['SHARED_DATA', 'USER_DATA', 'IP_DATA_LIB', 'TOOLS_DATA'];
   }
   var permittedResourcesFilters = [];
   dataTypes.forEach(function(dt) {
@@ -1447,6 +1448,7 @@ function startMaster(ticket, cb) {
   if (runasSid !== '') {
     var runasToolMountPoint = toolapps.getMountPoint(runasSid.toolId);
     var runasToolAdditionalMountPoints = toolapps.getAdditionalMountPoints(runasSid.toolId);
+    var runasToolVendor = toolapps.getVendor(runasSid.toolId);
 
     if (runasToolMountPoint !== 0) {
       allIds.push(runasToolMountPoint);
@@ -1491,6 +1493,8 @@ function startMaster(ticket, cb) {
             adminIds = admindata['SHARED_DATA'] || [];
           }
 
+          allIds = _.uniq(allIds);
+
           shares.getByIds(mysqlClient, allIds, function(err, projectShares) { // FIXME : if multiple clouds are introduced, add cloudId.
 
             mysqlClient.release();
@@ -1504,6 +1508,18 @@ function startMaster(ticket, cb) {
 
                 if (ticket.useradmin == 'C') { // Allow company admin to have write access to companies SHARED_DATA mounts.
                   if (adminIds.indexOf(''+n.id) !== -1) {
+                    mntp.mountParams = ro2rw(mntp.mountParams);
+                  }
+                }
+
+                // Allow tool Vendor to access tool mountpoints as r/w
+                if (sid.companyId == toolVendor) {
+                  if (n.id == toolMountPoint) {
+                    mntp.mountParams = ro2rw(mntp.mountParams);
+                  }
+                }
+                if (sid.companyId == runasToolVendor) {
+                  if (n.id == runasToolMountPoint) {
                     mntp.mountParams = ro2rw(mntp.mountParams);
                   }
                 }
