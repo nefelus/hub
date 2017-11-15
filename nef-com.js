@@ -113,13 +113,13 @@ program
        var id;
        var ids = '';
        if ( options.ids.length == 1) {
-         ids = ' = '+id;
+         ids = ' = '+options.ids[0];
        } else {
          for (var i = 0; i < options.ids.length; i++) {
            if (ids != '') {
              ids += ',';
            }
-           ids += id;
+           ids += options.ids[i];
          }
          if (ids !== '') {
            ids = ' IN ('+ids+')';
@@ -128,6 +128,8 @@ program
            process.exit(2);
          }
        }
+
+       var stmt = 'UPDATE IMAGES SET ACTIVE = "Y" where ID '+ids;
 
        dbSetup(program);
        mysqlPool = mysql.createPool(mysqlConfig);
@@ -144,7 +146,6 @@ program
              return;
            }
 
-           var stmt = 'UPDATE IMAGES SET ACTIVE = "Y" where ID '+ids;
            mysqlClient.query(stmt, function(err) {
              var exitCode = 0;
              if (err) {
@@ -169,19 +170,20 @@ program
    .option('-i, --ids <ids>', 'Deactivate images specified by their db ids from a comma separated list', listOfInts, [])
    .action(function(options){
      if (options.ids && options.ids.length > 0) {
-       var id;
        var ids = '';
+
        if ( options.ids.length == 1) {
-         ids = ' = '+id;
+         ids = ' = '+options.ids[0];
        } else {
          for (var i = 0; i < options.ids.length; i++) {
            if (ids != '') {
              ids += ',';
            }
-           ids += id;
+           ids += options.ids[i];
          }
            ids = ' IN ('+ids+')';
        }
+       var stmt = 'UPDATE IMAGES SET ACTIVE = "N" where ID '+ids;
 
        dbSetup(program);
        mysqlPool = mysql.createPool(mysqlConfig);
@@ -198,7 +200,6 @@ program
              return;
            }
 
-           var stmt = 'UPDATE IMAGES SET ACTIVE = "N" where ID '+ids;
            mysqlClient.query(stmt, function(err) {
              var exitCode = 0;
              if (err) {
