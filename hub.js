@@ -1811,9 +1811,11 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
             noResources = true;
             logger.log('RunInstances: ' + ((err.message) ? err.message : 'unknown error'));
             callback(null);
+            return;
           } else {
             logger.log('RunInstances error ', JSON.stringify(err));
             setTimeout(function() {callback(null);}, EC2_TIMEOUT);
+            return;
           }
         } else {
           if (data.Instances) {
@@ -1826,7 +1828,13 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
           } else {
             noResources = true;
           }
-          callback(null);
+          if (ready) {
+            callback(null);
+            return;
+          } else {
+            setTimeout(function() {callback(null);}, EC2_TIMEOUT);
+            return;
+          }
         }
       });
     },
@@ -1927,12 +1935,13 @@ function getMachinesInfo(machines, cb) {
   var machineCount = (machines) ? machines.length : 0;
 
   if (machineCount == 0) {
+    logger.log('No machines to get info');
     cb('No machines to get info', machinesInfo);
     return;
   }
 
   async.whilst(
-    function () { return machinesFound != machineCount && count < EC2_MAX_TRIES; },
+    function () { return (machinesFound != machineCount) && (count < EC2_MAX_TRIES); },
     function (callback) {
       machinesFound = 0;
       count++;
@@ -1942,7 +1951,7 @@ function getMachinesInfo(machines, cb) {
 
       ec2.describeInstances(args, function(err, data) {
         machinesInfo = [];
-        if (! err) {
+        if (err === null) {
           instances = extractInstances(data.Reservations);
           for (var m = 0; m < instances.length; m++) {
             if ((instances[m].PublicIpAddress !== undefined) && (instances[m].PublicIpAddress !== null) && (instances[m].PublicIpAddress !== '')) {
@@ -1956,8 +1965,14 @@ function getMachinesInfo(machines, cb) {
               machinesInfo.push(mi);
             }
           }
-          callback(null);
+          if (machinesFound === machineCount) {
+            callback(null);
+            return;
+          } else {
+            setTimeout(function() {callback(null);}, EC2_TIMEOUT);
+          }
         } else {
+          logger.log(util.inspect(err, {depth:null}));
           setTimeout(function() {callback(null);}, EC2_TIMEOUT);
         }
       });
@@ -1966,6 +1981,7 @@ function getMachinesInfo(machines, cb) {
       if (machinesFound == machineCount) {
         cb(null, machinesInfo);
       } else {
+        logger.log('Error or incomplete response');
         cb('Error or incomplete response', machinesInfo);
       }
     }
@@ -2049,15 +2065,19 @@ function getFreeAddress(cb) {
 
       ec2.describeAddresses(args, function(err, data) {
         if (! err) {
-          addressFound = true;
           if ((data.Addresses) && (data.Addresses.length)) {
             var _Addresses = _.filter(data.Addresses, function(o) { return typeof o.InstanceId === 'undefined'; });
             if ((_Addresses) && (_Addresses.length)) {
+              addressFound = true;
               var x = _.sample(_Addresses);
               address = x.PublicIp;
             }
           }
-          callback(null);
+          if (addressFound) {
+            callback(null);
+          } else {
+            setTimeout(function() {callback(null);}, EC2_TIMEOUT);
+          }
         } else {
           setTimeout(function() {callback(null);}, EC2_TIMEOUT);
         }
