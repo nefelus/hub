@@ -152,6 +152,7 @@ var r53info;
 var dnsPostprocess;
 
 var EC2_TIMEOUT;
+var EC2_SMALL_TIMEOUT;
 var EC2_MAX_TRIES;
 
 var keyName;
@@ -469,6 +470,7 @@ function loadConfig() {
   r53 = new AWS.Route53(EC2Params);
 
   EC2_TIMEOUT = mainconf.get('aws:ec2_timeout') || 10000;
+  EC2_SMALL_TIMEOUT = mainconf.get('aws:ec2_small_timeout') || 5000;
   EC2_MAX_TRIES = mainconf.get('aws:ec2_max_tries') || 60;
 
   masterScripts = mainconf.get('masterScripts') || false;
@@ -1969,7 +1971,7 @@ function getMachinesInfo(machines, cb) {
             callback(null);
             return;
           } else {
-            setTimeout(function() {callback(null);}, EC2_TIMEOUT);
+            setTimeout(function() {callback(null);}, EC2_SMALL_TIMEOUT);
           }
         } else {
           logger.log(util.inspect(err, {depth:null}));
