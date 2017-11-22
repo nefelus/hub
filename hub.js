@@ -1549,7 +1549,7 @@ function startMaster(ticket, cb) {
               userData['DISPLAY'] = ticket.XDisplay;
 
               if (setsecgroups) {
-                var iptables = secgroups.getRules(sid.companyId, sid.projectId);
+                var iptables = secgroups.getRules(sid.companyId, sid.projectId); // FIXME : if multiple clouds are introduced, add cloudId.
                 if (iptables.length > 0) {
                   iptables.forEach(function(n, i) {
                     //'sec_group_id':1,'company_id':0,'project_id':0,'id':1,'direction':'I','interface':'eth0','protocol':'tcp','address':'*','ports':'22','condition':'*'
