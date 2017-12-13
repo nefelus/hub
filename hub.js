@@ -2564,7 +2564,7 @@ var dispatcher = function dispatcher () {
                                             var now = nt.getDateTimeNow(true, false);
                                             mysqlKeys = ['LAUNCHED', 'INSTANCE_ID']; // INSTANCE_ID was MACHINE_NAME
                                             mysqlValues = [now, data[0].instanceId];
-                                            mysqlKeys.push('UUID');
+                                            mysqlKeys.push('CUUID');
                                             mysqlValues.push(t.get('uuid'));
                                             updateStatus(mysqlPool, hubreqid, 'SETUP', mysqlKeys, mysqlValues);
                                             logger.log(sessionId + ': Master ' + data[0].instanceId + ' started successfully');
