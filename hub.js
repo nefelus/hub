@@ -1537,7 +1537,7 @@ function startMaster(ticket, cb) {
                 }
               });
 
-              allShares = _.uniq(allShares, false, 'uuid');
+              allShares = _.uniqWith(allShares, function(a, b) { return a.uuid === b.uuid;});
 
               userData['reqSessionId'] = ticket.req.sessionId;
               userData['machineType'] = hubType;
