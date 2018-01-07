@@ -1808,7 +1808,8 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
       ec2.runInstances(args, function(err, data) {
         instanceIds = [];
         if (err) {
-          if ((err.statusCode) && (err.statusCode == 413) && (err.code) && (err.code === 'ResourceLimitExceeded')) {
+          if (((err.statusCode) && (err.statusCode == 413) && (err.code) && (err.code === 'ResourceLimitExceeded')) ||
+              ((err.statusCode) && (err.statusCode == 403) && (err.code) && (err.code === 'Forbidden') && (err.message) && (err.message.match(/^Quota exceeded/) !== null))) {
             ready = true;
             noResources = true;
             logger.log('RunInstances: ' + ((err.message) ? err.message : 'unknown error'));
