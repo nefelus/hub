@@ -1447,10 +1447,11 @@ function startMaster(ticket, cb) {
   });
 
   var runasSid = nt.parseSessionId(ticket.req.runas);
+  var runasToolVendor = null;
   if (runasSid !== '') {
     var runasToolMountPoint = toolapps.getMountPoint(runasSid.toolId);
     var runasToolAdditionalMountPoints = toolapps.getAdditionalMountPoints(runasSid.toolId);
-    var runasToolVendor = toolapps.getVendor(runasSid.toolId);
+    runasToolVendor = toolapps.getVendor(runasSid.toolId);
 
     if (runasToolMountPoint !== 0) {
       allIds.push(runasToolMountPoint);
@@ -1520,9 +1521,11 @@ function startMaster(ticket, cb) {
                     mntp.mountParams = ro2rw(mntp.mountParams);
                   }
                 }
-                if (sid.companyId == runasToolVendor) {
-                  if (n.id == runasToolMountPoint) {
-                    mntp.mountParams = ro2rw(mntp.mountParams);
+                if (runasSid !== '') {
+                  if ((runasToolVendor) && (sid.companyId == runasToolVendor)) {
+                    if (n.id == runasToolMountPoint) {
+                      mntp.mountParams = ro2rw(mntp.mountParams);
+                    }
                   }
                 }
 
