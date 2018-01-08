@@ -1369,7 +1369,7 @@ function restartMaster(instanceId, sessionId) {
             ticket.healthCheckTimer = setInterval(function() {
               InstanceHealthCheck(data[0].instanceId, sessionId, [
                 {'state':'terminated', 'action':restartMaster},
-                {'state':undefined, 'action':restartMaster},
+                {'state':'undefined', 'action':restartMaster},
                 {'state':'error', 'action':forceRestartMaster}
               ]);
             }, HEALTH_CHECK_INTERVAL);
@@ -2561,7 +2561,7 @@ var dispatcher = function dispatcher () {
                                             t.healthCheckTimer = setInterval(function() {
                                               InstanceHealthCheck(data[0].instanceId, sessionId, [
                                                 {'state' : 'terminated', 'action':restartMaster},
-                                                {'state' : undefined, 'action':restartMaster},
+                                                {'state' : 'undefined', 'action':restartMaster},
                                                 {'state' : 'error', 'action':forceRestartMaster}
                                               ]);
                                             }, HEALTH_CHECK_INTERVAL);
