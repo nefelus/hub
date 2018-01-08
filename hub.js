@@ -138,6 +138,7 @@ var SKIP_CYCLES = 4;
 tmp.setGracefulCleanup();
 
 var HEALTH_CHECK_INTERVAL = 30000; // 30 secs
+var RESTART_INTERVAL = 120000; // 30 secs
 var CONSOLE_CHECK_INTERVAL = 5000; // 5 secs
 var CONSOLE_CHECK_MAX_TIMES = 60;  // 60 times * 5 secs = 5 minutes
 
@@ -1300,10 +1301,10 @@ function restartMaster(instanceId, sessionId) {
         var mysqlValues;
         if (err) {
           if (ticket.get('restartLimit') > 0) {
-            logger.warn(sessionId + ': failed to restart master, will retry on next health check');
+            logger.warn(sessionId + ': failed to restart master, will retry in 2 mins');
             setTimeout(function() {
               restartMaster(instanceId, sessionId);
-            }, HEALTH_CHECK_INTERVAL);
+            }, RESTART_INTERVAL);
           } else {
             logger.warn(sessionId + ': failed to restart master and restart limit exceeded.');
             mysqlKeys = ['NOTE'];
