@@ -2286,6 +2286,7 @@ var dispatcher = function dispatcher () {
         var jobType;
         var machineId;
         var pendingSessions = [];
+        var pendingExecCompanyIds = [];
 
         quotas.stats.clear();
 
@@ -2296,6 +2297,7 @@ var dispatcher = function dispatcher () {
             case 'PENDING' :
               if ( rows[i]['COMMAND'].substr(0,5) == 'EXEC_') {
                 if (machineId !== 0 ) {
+                  pendingExecCompanyIds.push(rows[i]['COMPANY_ID']);
                   pendingSessions.push({ c : rows[i]['COMPANY_ID'] || 0,
                                          u : rows[i]['USER_ID'] || 0,
                                          p : rows[i]['PROJECT_ID'] || 0,
@@ -2339,171 +2341,269 @@ var dispatcher = function dispatcher () {
           }
         }
 
-        quotas.loadQueueQuotas(mysqlClient, pendingSessions, function(err, queueQuotaData){
-          if (err === null) {
+        getCompaniesCredit(mysqlPool, pendingExecCompanyIds, function(err, companyCredits) {
+          quotas.loadQueueQuotas(mysqlClient, pendingSessions, function(err, queueQuotaData){
+            if (err === null) {
 
-            machineId = 0;
-            totalPendingFound = records.length;
-            if (totalPendingFound > 0) {
-              pendingWereNone = false;
-              pendingNoneCnt  = 0;
-              logger.log(records.length + ' pending and ' + totalRunningFound + ' running jobs. State=' + mystate + ((! NSLM_BYPASS) ? (', license=' + (nslmSessionIsActive ? 'ok' : 'NOT ok')) : ''));
-              showProcessStats();
-              for (i = 0; i < records.length; i++) {
-                jobType = 'batch';
-                switch (records[i].COMMAND.toLowerCase()) {
+              machineId = 0;
+              totalPendingFound = records.length;
+              if (totalPendingFound > 0) {
+                pendingWereNone = false;
+                pendingNoneCnt  = 0;
+                logger.log(records.length + ' pending and ' + totalRunningFound + ' running jobs. State=' + mystate + ((! NSLM_BYPASS) ? (', license=' + (nslmSessionIsActive ? 'ok' : 'NOT ok')) : ''));
+                showProcessStats();
+                for (i = 0; i < records.length; i++) {
+                  jobType = 'batch';
+                  switch (records[i].COMMAND.toLowerCase()) {
 
-                  case 'user_terminate' :
-                    (function() {
-                      if (records[i].STATUS === 'PENDING') { // Check again because it might be changed previously in the loop.
-                        var realSession = getTicketIdBySessionId(records[i].SESSION_ID);
-                        if (realSession) {
-                          var realTicket = Tickets[realSession];
-                          if (realTicket.jobStatus == 'SETUP') {
-                            if (realTicket.getMaster('instanceId') != '') {
-                              realTicket.set('sessionStatus', 'finished');
-                              logger.log(records[i].SESSION_ID + ': Canceling instance '+realTicket.getMaster('instanceId'));
-                              TerminateSession(records[i].SESSION_ID);
-                              updateStatus(mysqlPool, realTicket.id, 'CANCELED', [], [], function(err, data) {}); // Don't send emails in such cases.
-                              updateStatus(mysqlPool, records[i].ID, 'ENDED', [], [], function(err, data) {}); // Don't send emails in such cases.
+                    case 'user_terminate' :
+                      (function() {
+                        if (records[i].STATUS === 'PENDING') { // Check again because it might be changed previously in the loop.
+                          var realSession = getTicketIdBySessionId(records[i].SESSION_ID);
+                          if (realSession) {
+                            var realTicket = Tickets[realSession];
+                            if (realTicket.jobStatus == 'SETUP') {
+                              if (realTicket.getMaster('instanceId') != '') {
+                                realTicket.set('sessionStatus', 'finished');
+                                logger.log(records[i].SESSION_ID + ': Canceling instance '+realTicket.getMaster('instanceId'));
+                                TerminateSession(records[i].SESSION_ID);
+                                updateStatus(mysqlPool, realTicket.id, 'CANCELED', [], [], function(err, data) {}); // Don't send emails in such cases.
+                                updateStatus(mysqlPool, records[i].ID, 'ENDED', [], [], function(err, data) {}); // Don't send emails in such cases.
+                              } else {
+                                logger.log(records[i].SESSION_ID + ': Scheduled for cancel.');
+                                realTicket.cancelPending = true;
+                              }
+                            } else if (realTicket.jobStatus == 'RUNNING') {
+                              middleSessionOperation('cancel', records[i].ID, records[i].SESSION_ID, mysqlPool, 'ENDED', {});
                             } else {
-                              logger.log(records[i].SESSION_ID + ': Scheduled for cancel.');
-                              realTicket.cancelPending = true;
+                              updateStatus(mysqlPool, records[i].ID, 'ENDED', [], [], function(err, data) {}); // Don't send emails in such cases.
                             }
-                          } else if (realTicket.jobStatus == 'RUNNING') {
-                            middleSessionOperation('cancel', records[i].ID, records[i].SESSION_ID, mysqlPool, 'ENDED', {});
                           } else {
                             updateStatus(mysqlPool, records[i].ID, 'ENDED', [], [], function(err, data) {}); // Don't send emails in such cases.
                           }
                         } else {
-                          updateStatus(mysqlPool, records[i].ID, 'ENDED', [], [], function(err, data) {}); // Don't send emails in such cases.
+                          logger.log(records[i].SESSION_ID + ': should have beed canceled already.');
                         }
-                      } else {
-                        logger.log(records[i].SESSION_ID + ': should have beed canceled already.');
-                      }
-                    })();
-                    break;
+                      })();
+                      break;
 
-                  case 'system_data_pull' :
-                    (function() {
-                      middleSessionOperation('data_pull', records[i].ID, records[i].SESSION_ID, mysqlPool, 'RUNNING', {'debugInfo' : '1'});
-                    })();
-                    break;
+                    case 'system_data_pull' :
+                      (function() {
+                        middleSessionOperation('data_pull', records[i].ID, records[i].SESSION_ID, mysqlPool, 'RUNNING', {'debugInfo' : '1'});
+                      })();
+                      break;
 
-                  case 'system_data_push' :
-                    (function() {
-                      middleSessionOperation('data_push', records[i].ID, records[i].SESSION_ID, mysqlPool, 'RUNNING', {'debugInfo' : '1'});
-                    })();
-                    break;
+                    case 'system_data_push' :
+                      (function() {
+                        middleSessionOperation('data_push', records[i].ID, records[i].SESSION_ID, mysqlPool, 'RUNNING', {'debugInfo' : '1'});
+                      })();
+                      break;
 
-                  case 'exec_batch':
-                  case 'exec_interactive':
-                  case 'exec_prompt':
-                    jobType = records[i].COMMAND.toLowerCase().replace(/^exec_/, '');
-                    if (mystate === 'on') {
-                      var isCancelPending = checkForPendingUserTerminate(records, records[i].SESSION_ID);
-                      if (isCancelPending !== null) {
+                    case 'exec_batch':
+                    case 'exec_interactive':
+                    case 'exec_prompt':
+                      jobType = records[i].COMMAND.toLowerCase().replace(/^exec_/, '');
+                      if (mystate === 'on') {
+                        var isCancelPending = checkForPendingUserTerminate(records, records[i].SESSION_ID);
+                        if (isCancelPending !== null) {
 
-                        logger.log(records[i].SESSION_ID + ': is being canceled as requested.');
-                        updateStatus(mysqlPool, records[i].ID , 'CANCELED', [], [], function(err, data) {}); // Don't send emails in such cases.
-                        updateStatus(mysqlPool, isCancelPending.id, 'ENDED', [], [], function(err, data) {}); // Don't send emails in such cases.
-                        records[isCancelPending.index].STATUS = 'ENDED';
-                      } else {
-                        if (nslmSessionIsActive) {
-                          isSessionActive = getTicketIdBySessionId(records[i].SESSION_ID);
-                          var currentSid = nt.parseSessionId(records[i].SESSION_ID);
-                          var runOrNot = false;
+                          logger.log(records[i].SESSION_ID + ': is being canceled as requested.');
+                          updateStatus(mysqlPool, records[i].ID , 'CANCELED', [], [], function(err, data) {}); // Don't send emails in such cases.
+                          updateStatus(mysqlPool, isCancelPending.id, 'ENDED', [], [], function(err, data) {}); // Don't send emails in such cases.
+                          records[isCancelPending.index].STATUS = 'ENDED';
+                        } else {
+                          if (nslmSessionIsActive) {
+                            isSessionActive = getTicketIdBySessionId(records[i].SESSION_ID);
+                            var currentSid = nt.parseSessionId(records[i].SESSION_ID);
+                            var runOrNot = false;
 
-                          if ((skippedSessions[records[i].SESSION_ID] !== undefined) && (skippedSessions[records[i].SESSION_ID] !== 0)) {
-                            skippedSessions[records[i].SESSION_ID] = skippedSessions[records[i].SESSION_ID] - 1;
-                          } else {
+                            if ((skippedSessions[records[i].SESSION_ID] !== undefined) && (skippedSessions[records[i].SESSION_ID] !== 0)) {
+                              skippedSessions[records[i].SESSION_ID] = skippedSessions[records[i].SESSION_ID] - 1;
+                            } else {
 
-                            var justnowDate = new Date();
-                            var justnow = Number(justnowDate.valueOf());
+                              var justnowDate = new Date();
+                              var justnow = Number(justnowDate.valueOf());
 
-                            var scheduledDateStr = records[i].SCHEDULED || null;
-                            var scheduledDate = new Date(scheduledDateStr);
-                            if (! nt.isValidDate(scheduledDate)) {
-                              scheduledDate = justnowDate;
-                            }
-                            var scheduled = Number(scheduledDate.valueOf());
-
-                            if (scheduled - justnow <= 0 ) {
-
-                              machineId = records[i].MACHINE_ID || 0;
-                              logger.log('Total running=' + totalRunningFound + ' MAX ALLOWED=' + quotas.limits.resolveLimits({cloud: machines.getCloudId(machineId)}));
-                              var machineType = machines.getSpeed(machineId);
-                              if ((! machines.exists(machineId)) || (machineId === 0)) {
-                                logger.log('WARNING: Undefined machine '+machineType+' '+machineId);
-                                machineType = '';
-                              } else {
-                                runOrNot = quotas.checkQueueQuota(currentSid.companyId, currentSid.clientId, currentSid.projectId, currentSid.toolId, machineId, machines.getCloudId(machineId), false, 1);
+                              var scheduledDateStr = records[i].SCHEDULED || null;
+                              var scheduledDate = new Date(scheduledDateStr);
+                              if (! nt.isValidDate(scheduledDate)) {
+                                scheduledDate = justnowDate;
                               }
+                              var scheduled = Number(scheduledDate.valueOf());
 
-                              if (runOrNot === true) {
-                                if (isSessionActive == null) {
-                                  totalRunningFound++;
+                              if (scheduled - justnow <= 0 ) {
+                                var hasCredit = companyCredits[currentSid.companyId] || false;
+                                if (hasCredit === true) { // Carry on
 
-                                  (function() {
-                                    var companyId = records[i]['COMPANY_ID'];
-                                    var userId = records[i]['USER_ID'];
-                                    var projectId = records[i]['PROJECT_ID'];
-                                    var toolId = records[i]['TOOL_ID'];
-                                    var sessionId = records[i].SESSION_ID;
-                                    var runas = records[i].RUN_AS || '';
-                                    var hubreqid = records[i].ID;
-                                    var machineId = records[i].MACHINE_ID || 0;
-                                    var machineSpeed = machines.getSpeed(machineId);
-                                    var threadCount = records[i].CPU_COUNT || null;
-                                    var machineCount = '1'; //FIXME
-                                    machineCount = parseInt(machineCount, 10);
-                                    if (isNaN(machineCount)) {
-                                      machineCount = 1;
-                                    }
-                                    var command = records[i].COMMAND;
-                                    var commandFile = records[i].COMMAND_FILE; // was INPUT_DIR
-                                    var runningDir = records[i].DATA_LOCATION;
-                                    var XDisplay = records[i].DISPLAY || null;
-                                    var XResolution = records[i].RESOLUTION || null;
-                                    var loginuser = records[i].LOGIN_NAME || 'nefelus';
-                                    var useradmin = records[i].USER_ADMIN || '';
-                                    var licenseManager = records[i].LICENSE_MANAGER || '';
-                                    var t = new Ticket(hubreqid);
-                                    t.setRequest('sessionId', sessionId);
-                                    t.setRequest('runas', runas);
-                                    t.setRequest('machineId', machineId);
-                                    t.setRequest('threadCount', threadCount);
-                                    t.setRequest('machineCount', machineCount);
-                                    t.setRequest('machineSpeed', machineSpeed); // FIXME : not really necessary
-                                    t.setRequest('commandFile', commandFile);
-                                    t.setRequest('runningDir', runningDir);
-                                    t.setRequest('licenseManager', licenseManager);
-                                    t.setRequest('jobType', jobType);
-                                    t.set('XDisplay', XDisplay);
-                                    t.set('XResolution', XResolution);
-                                    t.set('useradmin', useradmin);
-                                    if (setloginuser) {
-                                      t.set('loginuser', loginuser);
-                                    }
+                                  machineId = records[i].MACHINE_ID || 0;
+                                  logger.log('Total running=' + totalRunningFound + ' MAX ALLOWED=' + quotas.limits.resolveLimits({cloud: machines.getCloudId(machineId)}));
+                                  var machineType = machines.getSpeed(machineId);
+                                  if ((! machines.exists(machineId)) || (machineId === 0)) {
+                                    logger.log('WARNING: Undefined machine '+machineType+' '+machineId);
+                                    machineType = '';
+                                  } else {
+                                    runOrNot = quotas.checkQueueQuota(currentSid.companyId, currentSid.clientId, currentSid.projectId, currentSid.toolId, machineId, machines.getCloudId(machineId), false, 1);
+                                  }
 
-                                    logger.log(sessionId + ': Processing  ' + command + ' machineCount=' + machineCount + ' machineSpeed=' + machineSpeed);
+                                  if (runOrNot === true) {
+                                    if (isSessionActive == null) {
+                                      totalRunningFound++;
 
-                                    if ((machineCount > 0) && (machineSpeed !== '')) {
+                                      (function() {
+                                        var companyId = records[i]['COMPANY_ID'];
+                                        var userId = records[i]['USER_ID'];
+                                        var projectId = records[i]['PROJECT_ID'];
+                                        var toolId = records[i]['TOOL_ID'];
+                                        var sessionId = records[i].SESSION_ID;
+                                        var runas = records[i].RUN_AS || '';
+                                        var hubreqid = records[i].ID;
+                                        var machineId = records[i].MACHINE_ID || 0;
+                                        var machineSpeed = machines.getSpeed(machineId);
+                                        var threadCount = records[i].CPU_COUNT || null;
+                                        var machineCount = '1'; //FIXME
+                                        machineCount = parseInt(machineCount, 10);
+                                        if (isNaN(machineCount)) {
+                                          machineCount = 1;
+                                        }
+                                        var command = records[i].COMMAND;
+                                        var commandFile = records[i].COMMAND_FILE; // was INPUT_DIR
+                                        var runningDir = records[i].DATA_LOCATION;
+                                        var XDisplay = records[i].DISPLAY || null;
+                                        var XResolution = records[i].RESOLUTION || null;
+                                        var loginuser = records[i].LOGIN_NAME || 'nefelus';
+                                        var useradmin = records[i].USER_ADMIN || '';
+                                        var licenseManager = records[i].LICENSE_MANAGER || '';
+                                        var t = new Ticket(hubreqid);
+                                        t.setRequest('sessionId', sessionId);
+                                        t.setRequest('runas', runas);
+                                        t.setRequest('machineId', machineId);
+                                        t.setRequest('threadCount', threadCount);
+                                        t.setRequest('machineCount', machineCount);
+                                        t.setRequest('machineSpeed', machineSpeed); // FIXME : not really necessary
+                                        t.setRequest('commandFile', commandFile);
+                                        t.setRequest('runningDir', runningDir);
+                                        t.setRequest('licenseManager', licenseManager);
+                                        t.setRequest('jobType', jobType);
+                                        t.set('XDisplay', XDisplay);
+                                        t.set('XResolution', XResolution);
+                                        t.set('useradmin', useradmin);
+                                        if (setloginuser) {
+                                          t.set('loginuser', loginuser);
+                                        }
 
-                                      logger.log(sessionId + ': New Ticket : ID = t' + hubreqid);
-                                      logger.log(sessionId + ': Ticket : ' + JSON.stringify(t));
+                                        logger.log(sessionId + ': Processing  ' + command + ' machineCount=' + machineCount + ' machineSpeed=' + machineSpeed);
 
-                                      updateStatus(mysqlPool, hubreqid, 'SETUP', ['QUEUE_INFO'], ['']);
-                                      // Add Stats here and do not wait until machine is started!
-                                      quotas.stats.add(companyId || 0, userId || 0, projectId || 0, toolId || 0, machineId, machines.getCloudId(machineId));
+                                        if ((machineCount > 0) && (machineSpeed !== '')) {
 
-                                      startMaster(t, function(err, data) {
-                                        var mysqlKeys;
-                                        var mysqlValues;
-                                        if (err) {
-                                          logger.log(sessionId + ': ERROR STARTING MASTER');
-                                          mysqlKeys = ['NOTE'];
-                                          mysqlValues = ['Error starting master'];
+                                          logger.log(sessionId + ': New Ticket : ID = t' + hubreqid);
+                                          logger.log(sessionId + ': Ticket : ' + JSON.stringify(t));
+
+                                          updateStatus(mysqlPool, hubreqid, 'SETUP', ['QUEUE_INFO'], ['']);
+                                          // Add Stats here and do not wait until machine is started!
+                                          quotas.stats.add(companyId || 0, userId || 0, projectId || 0, toolId || 0, machineId, machines.getCloudId(machineId));
+
+                                          startMaster(t, function(err, data) {
+                                            var mysqlKeys;
+                                            var mysqlValues;
+                                            if (err) {
+                                              logger.log(sessionId + ': ERROR STARTING MASTER');
+                                              mysqlKeys = ['NOTE'];
+                                              mysqlValues = ['Error starting master'];
+                                              t.deAssociate();
+                                              t = null;
+                                              updateStatus(mysqlPool, hubreqid, 'ERROR', mysqlKeys, mysqlValues, function(err, data) {
+                                                if (!err) {
+                                                  sendSessionStatusEmail(sessionId, hubreqid, mysqlPool);
+                                                }
+                                              });
+                                            } else {
+                                              if ((data) && (data.length)) {
+                                                t.setMaster('instanceId', data[0].instanceId);
+                                                t.setMaster('ip', data[0].ip);
+                                                t.setMaster('publicIp', data[0].publicIp);
+                                                t.setDynamicNFSShare('ip', data[0].ip);
+                                                t.setDynamicNFSShare('ip', data[0].publicIp);
+                                                t.setMaster('publicDnsName', data[0].dnsName);
+                                                t.setMaster('aliasDnsName', '');
+                                                switch (dnsPostprocess) {
+                                                  case 'none' :
+                                                    t.setMaster('aliasDnsName', dns.dnsNone(data[0].dnsName));
+                                                    break;
+                                                  case 'dnsresolve' :
+                                                    dns.dnsResolve(data[0].publicIp, mainconf.get('aws:dnsresolve:domainName'), function (err, data) {
+                                                      if (! err) {
+                                                        t.setMaster('aliasDnsName', data);
+                                                      }
+                                                    });
+                                                    break;
+                                                  case 'dnstransform' :
+                                                    dns.dnsTransform(data[0].publicIp, mainconf.get('aws:dnstransform'), function (err, data) {
+                                                      t.setMaster('aliasDnsName', data);
+                                                    });
+                                                    break;
+                                                  case 'dnsmap' :
+                                                    dns.dnsMap(data[0].publicIp, mainconf.get('aws:dnsmap:map'), function (err, data) {
+                                                      t.setMaster('aliasDnsName', data);
+                                                    });
+                                                    break;
+                                                  case 'route53' :
+                                                  default :
+                                                    // Create Route53 record
+                                                    dns.createCNAME(r53, r53info, data[0].dnsName, function(err, r53data) {
+                                                      if (err) {
+                                                        if (r53info) {
+                                                          logger.log(sessionId + ': ' + err);
+                                                        }
+                                                      } else {
+                                                        logger.log(sessionId + ': Registered ' + data[0].dnsName + ' as ' + r53data);
+                                                        t.setMaster('aliasDnsName', r53data);
+                                                      }
+                                                    });
+                                                    break;
+                                                }
+                                                if (useDynamicNFSShares === true) {
+                                                  activateNFSShares(data[0].instanceId, sessionId);
+                                                }
+                                                t.healthCheckTimer = setInterval(function() {
+                                                  InstanceHealthCheck(data[0].instanceId, sessionId, [
+                                                    {'state' : 'terminated', 'action':restartMaster},
+                                                    {'state' : 'undefined', 'action':restartMaster},
+                                                    {'state' : 'error', 'action':forceRestartMaster}
+                                                  ]);
+                                                }, HEALTH_CHECK_INTERVAL);
+                                                var now = nt.getDateTimeNow(true, false);
+                                                mysqlKeys = ['LAUNCHED', 'INSTANCE_ID']; // INSTANCE_ID was MACHINE_NAME
+                                                mysqlValues = [now, data[0].instanceId];
+                                                mysqlKeys.push('CUUID');
+                                                mysqlValues.push(t.get('uuid'));
+                                                updateStatus(mysqlPool, hubreqid, 'SETUP', mysqlKeys, mysqlValues);
+                                                logger.log(sessionId + ': Master ' + data[0].instanceId + ' started successfully');
+                                              } else {
+                                                t.deAssociate();
+                                                t = null;
+                                                if (data === null) {
+                                                  // if startMaster returns null data put back in queue
+                                                  // FIXME : skip for some cycles...
+                                                  skippedSessions[sessionId] = SKIP_CYCLES;
+                                                  updateStatus(mysqlPool, hubreqid, 'PENDING', ['QUEUE_INFO'], ['{"message":"Cloud resources exhausted"}']);
+                                                  logger.warn(sessionId + ': failed to start master due to limitted cloud resources, will retry on next check');
+                                                } else {
+                                                  logger.log(sessionId + ': ERROR SETTING UP JOB, startMachines returned empty value');
+                                                  mysqlKeys = ['NOTE'];
+                                                  mysqlValues = ['Error setting up job'];
+                                                  updateStatus(mysqlPool, hubreqid, 'ERROR', mysqlKeys, mysqlValues, function(err, data) {
+                                                    if (!err) {
+                                                      sendSessionStatusEmail(sessionId, hubreqid, mysqlPool);
+                                                    }
+                                                  });
+                                                }
+                                              }
+                                            }
+                                          });
+                                        } else {
+                                          logger.log(sessionId + ': ERROR SETTING UP JOB : machines requested =' + machineCount + ' ' + machineSpeed );
+                                          var mysqlKeys = ['NOTE'];
+                                          var mysqlValues = ['Error setting up job'];
                                           t.deAssociate();
                                           t = null;
                                           updateStatus(mysqlPool, hubreqid, 'ERROR', mysqlKeys, mysqlValues, function(err, data) {
@@ -2511,150 +2611,59 @@ var dispatcher = function dispatcher () {
                                               sendSessionStatusEmail(sessionId, hubreqid, mysqlPool);
                                             }
                                           });
-                                        } else {
-                                          if ((data) && (data.length)) {
-                                            t.setMaster('instanceId', data[0].instanceId);
-                                            t.setMaster('ip', data[0].ip);
-                                            t.setMaster('publicIp', data[0].publicIp);
-                                            t.setDynamicNFSShare('ip', data[0].ip);
-                                            t.setDynamicNFSShare('ip', data[0].publicIp);
-                                            t.setMaster('publicDnsName', data[0].dnsName);
-                                            t.setMaster('aliasDnsName', '');
-                                            switch (dnsPostprocess) {
-                                              case 'none' :
-                                                t.setMaster('aliasDnsName', dns.dnsNone(data[0].dnsName));
-                                                break;
-                                              case 'dnsresolve' :
-                                                dns.dnsResolve(data[0].publicIp, mainconf.get('aws:dnsresolve:domainName'), function (err, data) {
-                                                  if (! err) {
-                                                    t.setMaster('aliasDnsName', data);
-                                                  }
-                                                });
-                                                break;
-                                              case 'dnstransform' :
-                                                dns.dnsTransform(data[0].publicIp, mainconf.get('aws:dnstransform'), function (err, data) {
-                                                  t.setMaster('aliasDnsName', data);
-                                                });
-                                                break;
-                                              case 'dnsmap' :
-                                                dns.dnsMap(data[0].publicIp, mainconf.get('aws:dnsmap:map'), function (err, data) {
-                                                  t.setMaster('aliasDnsName', data);
-                                                });
-                                                break;
-                                              case 'route53' :
-                                              default :
-                                                // Create Route53 record
-                                                dns.createCNAME(r53, r53info, data[0].dnsName, function(err, r53data) {
-                                                  if (err) {
-                                                    if (r53info) {
-                                                      logger.log(sessionId + ': ' + err);
-                                                    }
-                                                  } else {
-                                                    logger.log(sessionId + ': Registered ' + data[0].dnsName + ' as ' + r53data);
-                                                    t.setMaster('aliasDnsName', r53data);
-                                                  }
-                                                });
-                                                break;
-                                            }
-                                            if (useDynamicNFSShares === true) {
-                                              activateNFSShares(data[0].instanceId, sessionId);
-                                            }
-                                            t.healthCheckTimer = setInterval(function() {
-                                              InstanceHealthCheck(data[0].instanceId, sessionId, [
-                                                {'state' : 'terminated', 'action':restartMaster},
-                                                {'state' : 'undefined', 'action':restartMaster},
-                                                {'state' : 'error', 'action':forceRestartMaster}
-                                              ]);
-                                            }, HEALTH_CHECK_INTERVAL);
-                                            var now = nt.getDateTimeNow(true, false);
-                                            mysqlKeys = ['LAUNCHED', 'INSTANCE_ID']; // INSTANCE_ID was MACHINE_NAME
-                                            mysqlValues = [now, data[0].instanceId];
-                                            mysqlKeys.push('CUUID');
-                                            mysqlValues.push(t.get('uuid'));
-                                            updateStatus(mysqlPool, hubreqid, 'SETUP', mysqlKeys, mysqlValues);
-                                            logger.log(sessionId + ': Master ' + data[0].instanceId + ' started successfully');
-                                          } else {
-                                            t.deAssociate();
-                                            t = null;
-                                            if (data === null) {
-                                              // if startMaster returns null data put back in queue
-                                              // FIXME : skip for some cycles...
-                                              skippedSessions[sessionId] = SKIP_CYCLES;
-                                              updateStatus(mysqlPool, hubreqid, 'PENDING', ['QUEUE_INFO'], ['{"message":"Cloud resources exhausted"}']);
-                                              logger.warn(sessionId + ': failed to start master due to limitted cloud resources, will retry on next check');
-                                            } else {
-                                              logger.log(sessionId + ': ERROR SETTING UP JOB, startMachines returned empty value');
-                                              mysqlKeys = ['NOTE'];
-                                              mysqlValues = ['Error setting up job'];
-                                              updateStatus(mysqlPool, hubreqid, 'ERROR', mysqlKeys, mysqlValues, function(err, data) {
-                                                if (!err) {
-                                                  sendSessionStatusEmail(sessionId, hubreqid, mysqlPool);
-                                                }
-                                              });
-                                            }
-                                          }
                                         }
-                                      });
+                                      })();
                                     } else {
-                                      logger.log(sessionId + ': ERROR SETTING UP JOB : machines requested =' + machineCount + ' ' + machineSpeed );
-                                      var mysqlKeys = ['NOTE'];
-                                      var mysqlValues = ['Error setting up job'];
-                                      t.deAssociate();
-                                      t = null;
-                                      updateStatus(mysqlPool, hubreqid, 'ERROR', mysqlKeys, mysqlValues, function(err, data) {
-                                        if (!err) {
-                                          sendSessionStatusEmail(sessionId, hubreqid, mysqlPool);
-                                        }
-                                      });
+                                      var activeTicket = Tickets[isSessionActive];
+                                      logger.warn(records[i].SESSION_ID + ': Trying to start an active session! This should not have happened.');
+                                      logger.warn(records[i].SESSION_ID + ': Trying to recover last valid status.');
+                                      if (activeTicket.jobStatus !== '') {
+                                        recoverStatus(mysqlPool, records[i].ID, activeTicket.jobStatus);
+                                      }
                                     }
-                                  })();
-                                } else {
-                                  var activeTicket = Tickets[isSessionActive];
-                                  logger.warn(records[i].SESSION_ID + ': Trying to start an active session! This should not have happened.');
-                                  logger.warn(records[i].SESSION_ID + ': Trying to recover last valid status.');
-                                  if (activeTicket.jobStatus !== '') {
-                                    recoverStatus(mysqlPool, records[i].ID, activeTicket.jobStatus);
+                                  } else {
+                                    // Log the reason why it is left on queue.
+                                    if (runOrNot !== false) {
+                                      var previousQueueInfo = records[i].QUEUE_INFO || '';
+                                      if (previousQueueInfo !== runOrNot) {
+                                        updateStatus(mysqlPool, records[i].ID, 'PENDING', ['QUEUE_INFO'], [runOrNot]);
+                                      }
+                                      logger.log(records[i].SESSION_ID + ': Left in Queue: '+runOrNot);
+                                    }
                                   }
+                                } else {
+                                  updateStatus(mysqlPool, records[i].ID, 'NOCREDIT', [], []);
                                 }
                               } else {
-                                // Log the reason why it is left on queue.
-                                if (runOrNot !== false) {
-                                  var previousQueueInfo = records[i].QUEUE_INFO || '';
-                                  if (previousQueueInfo !== runOrNot) {
-                                    updateStatus(mysqlPool, records[i].ID, 'PENDING', ['QUEUE_INFO'], [runOrNot]);
-                                  }
-                                  logger.log(records[i].SESSION_ID + ': Left in Queue: '+runOrNot);
-                                }
+                                logger.log(records[i].SESSION_ID + ': Session is scheduled for '+scheduledDate);
                               }
-                            } else {
-                              logger.log(records[i].SESSION_ID + ': Session is scheduled for '+scheduledDate);
                             }
                           }
                         }
                       }
-                    }
-                    break;
+                      break;
 
-                  default :
-                    if (mystate === 'on') {
-                      //updateStatus(mysqlPool, records[i].ID, 'processing');
-                      logger.log('Unhandled command ' + records[i].COMMAND);
-                    }
-                    break;
+                    default :
+                      if (mystate === 'on') {
+                        //updateStatus(mysqlPool, records[i].ID, 'processing');
+                        logger.log('Unhandled command ' + records[i].COMMAND);
+                      }
+                      break;
+                  }
                 }
+              } else {
+                if ((pendingWereNone === false) || ((pendingNoneCnt % PENDING_NONE_TIMES_TO_SKIP) == 0)) {
+                  logger.log('0 pending and ' + totalRunningFound + ' running jobs. State=' + mystate + ((! NSLM_BYPASS) ? (', license=' + (nslmSessionIsActive ? 'ok' : 'NOT ok')) : ''));
+                  showProcessStats();
+                }
+                pendingWereNone = true;
+                pendingNoneCnt++;
               }
-            } else {
-              if ((pendingWereNone === false) || ((pendingNoneCnt % PENDING_NONE_TIMES_TO_SKIP) == 0)) {
-                logger.log('0 pending and ' + totalRunningFound + ' running jobs. State=' + mystate + ((! NSLM_BYPASS) ? (', license=' + (nslmSessionIsActive ? 'ok' : 'NOT ok')) : ''));
-                showProcessStats();
-              }
-              pendingWereNone = true;
-              pendingNoneCnt++;
             }
-          }
 
-          mysqlClient.release();
+            mysqlClient.release();
 
+          });
         });
       });
     });
@@ -4027,4 +4036,57 @@ function TerminateLongRunningSessions() {
       }
     }
   }
+}
+
+function getCompaniesCredit(sqlpool, companyIds, cb) {
+  if (companyIds.length === 0) {
+    cb(null, {});
+    return;
+  }
+  var res = {};
+  if (sqlpool !== null) {
+    sqlpool.getConnection(function(err, client) {
+      if (err) {
+        logger.log(err);
+        cb(err, res);
+        return;
+      }
+      client.query(SQL.availableCredit, [companyIds], function (err, rows, fields) {
+        if (err) {
+          logger.log(err);
+          cb(err, res);
+          return;
+        } else {
+          var companyId, availableCredit, i, total, dueAmount, amount, discount, chargedAmount, remainingAmount;
+          for (i=0; i < rows.length; i++) {
+            availableCredit = false;
+            companyId =  rows[i]['COMPANY_ID'];
+            remainingAmount = rows[i]['REMAINING_AMOUNT'];
+            amount = rows[i]['AMOUNT'];
+            dueAmount = rows[i]['DUE_AMOUNT'];
+            discount = rows[i]['DISCOUNT'];
+            chargedAmount = rows[i]['CHARGED_AMOUNT'];
+            total = amount + discount;
+            remainingAmount = total - chargedAmount - dueAmount;
+            if (remainingAmount > 0) {
+              availableCredit = true;
+            } else {
+              var p = 100 * remainingAmount / total;
+              if (p < 10) {
+                availableCredit = true;
+              }
+            }
+            res[companyId] = availableCredit;
+          }
+          cb(err, res);
+        }
+        client.release();
+      });
+    });
+  } else {
+    logger.log('Could not establish connection to mysql server');
+    cb('Could not establish connection to mysql server', {});
+    return;
+  }
+
 }
