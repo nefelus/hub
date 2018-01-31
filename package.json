@@ -3,7 +3,7 @@
   "description": "Nefelus HUB",
   "version": "1.12.0",
   "dependencies": {
-    "archiver": "2.1.0",
+    "archiver": "2.1.1",
     "async": "2.6.0",
     "aws-sdk": "2.148.0",
     "cli-table2": "0.2.0",
