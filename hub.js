@@ -309,6 +309,7 @@ function loadConfig() {
             ssl : false,
             ignoreInstallationIdInFilemanagerOps : false,
             hasAutoAssignFloatingIp : true
+            logHeartBeats : true
           });
 
   timezone = mainconf.get('timezone') || null;
@@ -494,6 +495,7 @@ function loadConfig() {
   setloginuser = mainconf.get('setloginuser') || false;
   setsecgroups = mainconf.get('setsecgroups') || false;
   hasAutoAssignFloatingIp = mainconf.get('hasAutoAssignFloatingIp');
+  logHeartBeats = mainconf.get('logHeartBeats');
   workerUsername = mainconf.get('vm:username');
   defaultRootVolumeSize = mainconf.get('vm:rootVolumeSize') || 0;
   defaultRootVolumeSize = parseInt(defaultRootVolumeSize, 10);
@@ -2719,7 +2721,9 @@ io.on('connection', function (socket) {
       var lastMsg = msg.lastMsg || {};
       var lastMsgData = lastMsg.data || {};
       var myticket;
-      logger.log('Got HEARTBEAT from socket '+socket.id+' instance "' + instance + '"' + ((sessionId !== '') ? ' serving session "' + sessionId + '"' : ''));
+      if (logHeartBeats === true) {
+        logger.log('Got HEARTBEAT from socket '+socket.id+' instance "' + instance + '"' + ((sessionId !== '') ? ' serving session "' + sessionId + '"' : ''));
+      }
       //logger.log('instance', socket.nefinstanceId || '');
       //logger.log('session', socket.nefsessionId || '');
       //logger.log('hostname', socket.nefhostname || '');

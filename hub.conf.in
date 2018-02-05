@@ -18,6 +18,9 @@ filemanager = "https://hub.example.com:8888"
 # hasAutoAssignFloatingIp : flag if the cloud stack assigns an IP address to the launching VM.
 hasAutoAssignFloatingIp : false
 
+# logHeartBeats : flag if the incomming heartbeat messages from workers are logged or not
+logHeartBeats : true
+
 skipCycles = 8
 cancelHours = 0
 forceCancelHours = 0
