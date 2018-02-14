@@ -308,7 +308,7 @@ function loadConfig() {
             host : 'localhost',
             ssl : false,
             ignoreInstallationIdInFilemanagerOps : false,
-            hasAutoAssignFloatingIp : true
+            hasAutoAssignFloatingIp : true,
             logHeartBeats : true
           });
 
