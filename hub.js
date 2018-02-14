@@ -1442,7 +1442,7 @@ function startMaster(ticket, cb) {
   if (nt.isSetSessionParam(ticket.req.sessionId, '4d')) { // Allow only documentation viewing.
     dataTypes = ['IP_DOCS', 'TOOL_DOCS'];
   } else {
-    dataTypes = ['SHARED_DATA', 'USER_DATA', 'IP_DATA_LIB', 'TOOLS_DATA'];
+    dataTypes = ['SHARED_DATA', 'USER_DATA', 'IP_DATA_LIB'];
   }
   var permittedResourcesFilters = [];
   dataTypes.forEach(function(dt) {
@@ -1489,16 +1489,26 @@ function startMaster(ticket, cb) {
         permittedResourcesFilters = [];
         if (ticket.useradmin == 'C') {
           permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype:'SHARED_DATA', inherit: true});
+        } else if (ticket.useradmin == 'V') {
+          permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype:'SHARED_DATA', inherit: true});
+          if (nt.isSetSessionParam(ticket.req.sessionId, '4v')) { // Vendor Terminal
+            permittedResourcesFilters.push({company:sid.companyId, user:null, project:null, rtype:'TOOLS_DATA', inherit: true});
+            permittedResourcesFilters.push({company:sid.companyId, user:null, project:null, rtype:'IP_DATA', inherit: true});
+          }
         }
-        // Get shares in order to allow company admin to have write access to companies SHARED_DATA mounts.
+        // Get shares in order to allow company admin to have write access to companies mounts.
         quotashares.getPermittedResources(mysqlClient, permittedResourcesFilters, function (err, admindata) {
           if (err) {
             logger.log('ERROR: There was an error while fetching quotashares. Machine might launch without all external disks');
           }
+          adminIds = [];
           if (admindata) {
-            adminIds = admindata['SHARED_DATA'] || [];
+            adminIds = adminIds.concat( admindata['SHARED_DATA'] || []);
+            adminIds = adminIds.concat( admindata['TOOLS_DATA'] || []);
+            adminIds = adminIds.concat( admindata['IP_DATA'] || []);
           }
 
+          allIds = allIds.concat(adminIds);
           allIds = _.uniq(allIds);
 
           shares.getByIds(mysqlClient, allIds, function(err, projectShares) { // FIXME : if multiple clouds are introduced, add cloudId.
@@ -1512,7 +1522,7 @@ function startMaster(ticket, cb) {
                 var j;
                 var mntp=n;
 
-                if (ticket.useradmin == 'C') { // Allow company admin to have write access to companies SHARED_DATA mounts.
+                if ((ticket.useradmin == 'C') || (ticket.useradmin == 'V')) { // Allow company admin to have write access to companies mounts.
                   if (adminIds.indexOf(''+n.id) !== -1) {
                     mntp.mountParams = ro2rw(mntp.mountParams);
                   }
