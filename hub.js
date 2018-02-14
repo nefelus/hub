@@ -3380,13 +3380,13 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
             if (moment.tz.names().indexOf(timezone) === -1) {
               timezone = 'UTC';
             }
-            if ((record.started) && (record.started !== '')) {
+            if ((record.started) && (record.started !== '') && (record.started !== 'null')) {
               var dts = moment( ((record.started).replace(/\//g, '-'))).tz(timezone);
               record.started = dts.format('ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)');
             } else {
               record.started = 'N/A';
             }
-            if ((record.completed) && (record.completed !== '')) {
+            if ((record.completed) && (record.completed !== '') && (record.completed !== 'null')) {
               var dtc = moment( ((record.completed).replace(/\//g, '-'))).tz(timezone);
               record.completed = dtc.format('ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)');
             } else {
