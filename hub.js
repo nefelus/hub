@@ -3381,7 +3381,7 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
           for (i = 0; i < rows.length; i++) {
             for (j = 0; j < fields.length; j++) {
               record[fields[j].name] = rows[i][fields[j].name];
-              if (typeof record[fields[j].name] === 'object') {
+              if ((typeof record[fields[j].name] === 'object') && (record[fields[j].name] !== null)) {
                 record[fields[j].name] += '';
               }
             }
@@ -3390,13 +3390,13 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
             if (moment.tz.names().indexOf(timezone) === -1) {
               timezone = 'UTC';
             }
-            if ((record.started) && (record.started !== '') && (record.started !== 'null')) {
+            if ((record.started) && (record.started !== '')) {
               var dts = moment( ((record.started).replace(/\//g, '-'))).tz(timezone);
               record.started = dts.format('ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)');
             } else {
               record.started = 'N/A';
             }
-            if ((record.completed) && (record.completed !== '') && (record.completed !== 'null')) {
+            if ((record.completed) && (record.completed !== '')) {
               var dtc = moment( ((record.completed).replace(/\//g, '-'))).tz(timezone);
               record.completed = dtc.format('ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)');
             } else {
