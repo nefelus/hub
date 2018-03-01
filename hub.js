@@ -1577,9 +1577,11 @@ function startMaster(ticket, cb) {
                   });
                 }
                 if (ticket.licenseManager !== '') {
-                  var lmp = ticket.licenseManager.replace(/@.*/,'');
-                  var lma = ticket.licenseManager.replace(/.*@/,'');
-                  userData['srLM'] = 'E eth0 tcp ' + lma + ' ' + lmp + ' *';
+                  ticket.licenseManager.split(':').forEach(function(licenseManager, i) {
+                    var lmp = ticket.licenseManager.replace(/@.*/,'');
+                    var lma = ticket.licenseManager.replace(/.*@/,'');
+                    userData['srLM'+i] = 'E eth0 tcp ' + lma + ' ' + lmp + ' *';
+                  });
                 }
               }
 
