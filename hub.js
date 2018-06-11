@@ -1556,7 +1556,7 @@ function startMaster(ticket, cb) {
                   default:
                     break;
                 }
-
+                
                 if ((ticket.useradmin == 'C') || (ticket.useradmin == 'V')) { // Allow company admin to have write access to companies mounts.
                   if (quotashares.getPermission(adminIds, n.id) !== null) { // TODO: old style quota system
                     mntp.mountParams = ro2rw(mntp.mountParams);
@@ -2043,7 +2043,7 @@ function getMachinesInfo(machines, cb) {
       if (machinesFound == machineCount) {
         cb(null, machinesInfo);
       } else {
-        logger.log('Error or incomplete response');
+        logger.log(err);
         cb('Error or incomplete response', machinesInfo);
       }
     }
@@ -2070,6 +2070,7 @@ function associateNextFreeAddress(instanceId, auto, cb) {
 
   getFreeAddress(function(err, address) {
     if (err) {
+      logger.log(err);
       cb(err, {instance: instanceId, address: false});
       return;
     } else {
@@ -2104,6 +2105,7 @@ function associateNextFreeAddress(instanceId, auto, cb) {
           if (addressAssociated === true) {
             cb(null, {instance: instanceId, address: address});
           } else {
+            logger.log(err);
             cb('Error or incomplete response', {instance: instanceId, address: false});
           }
         }
@@ -2146,6 +2148,7 @@ function getFreeAddress(cb) {
       });
     },
     function (err) {
+      logger.log(err);
       cb (((addressFound === true) ? null : 'Error or incomplete response'), address);
     }
   );
