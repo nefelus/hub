@@ -1404,6 +1404,17 @@ function restartMaster(instanceId, sessionId) {
   }
 }
 
+function rw2ro(s) {
+  var m = s.match(/(^\s*rw\s*,*)|(\s*,*rw\s*$)|(\s*,\s*rw\s*,\s*)/);
+
+  if (m) {
+    var newstr = m[0].replace(/rw/,'ro');
+    var r = s.replace(/(^\s*rw\s*,*)|(\s*,*rw\s*$)|(\s*,\s*rw\s*,\s*)/g, newstr);
+    return r;
+  }
+  return s;
+}
+
 function ro2rw(s) {
   var m = s.match(/(^\s*ro\s*,*)|(\s*,*ro\s*$)|(\s*,\s*ro\s*,\s*)/);
 
@@ -1431,22 +1442,22 @@ function startMaster(ticket, cb) {
   var toolVendor = toolapps.getVendor(sid.toolId);
 
   if (toolMountPoint !== 0) {
-    allIds.push(toolMountPoint);
+    allIds.push({id: toolMountPoint, perm: 1}); // tool mountpoint is read/only = 1
   }
 
   if (toolAdditionalMountPoints !== 0) {
-    allIds = allIds.concat(toolAdditionalMountPoints);
+    allIds = allIds.concat(toolAdditionalMountPoints.map(function(x) {var a={}; a.id=x; a.perm=1; return a;})); // tool mountpoints are read/only = 1
   }
 
   var dataTypes;
   if (nt.isSetSessionParam(ticket.req.sessionId, '4d')) { // Allow only documentation viewing.
     dataTypes = ['IP_DOCS', 'TOOL_DOCS'];
   } else {
-    dataTypes = ['SHARED_DATA', 'USER_DATA', 'IP_DATA_LIB'];
+    dataTypes = ['USER_DATA', 'IP_DATA_LIB'];
   }
   var permittedResourcesFilters = [];
   dataTypes.forEach(function(dt) {
-    permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype: dt, inherit:(dt !== 'USER_DATA')});
+    permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype: dt, explicit: (dt === 'USER_DATA'), inherit:(dt !== 'USER_DATA')});
   });
 
   var runasSid = nt.parseSessionId(ticket.req.runas);
@@ -1457,15 +1468,15 @@ function startMaster(ticket, cb) {
     runasToolVendor = toolapps.getVendor(runasSid.toolId);
 
     if (runasToolMountPoint !== 0) {
-      allIds.push(runasToolMountPoint);
+      allIds.push({id: runasToolMountPoint, perm: 1}); // tool mountpoint is read/only = 1
     }
 
     if (runasToolAdditionalMountPoints !== 0) {
-      allIds = allIds.concat(runasToolAdditionalMountPoints);
+      allIds = allIds.concat(runasToolAdditionalMountPoints.map(function(x) {var a={}; a.id=x; a.perm=1; return a;})); // tool mountpoints are read/only = 1
     }
 
     dataTypes.forEach(function(dt) {
-      permittedResourcesFilters.push({company:runasSid.companyId, user:runasSid.clientId, project:runasSid.projectId, rtype: dt, inherit:(dt !== 'USER_DATA')});
+      permittedResourcesFilters.push({company:runasSid.companyId, user:runasSid.clientId, project:runasSid.projectId, rtype: dt, explicit: (dt === 'USER_DATA'), inherit:(dt !== 'USER_DATA')});
     });
   }
 
@@ -1488,12 +1499,12 @@ function startMaster(ticket, cb) {
         }
         permittedResourcesFilters = [];
         if (ticket.useradmin == 'C') {
-          permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype:'SHARED_DATA', inherit: true});
+          //permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype:'SHARED_DATA', inherit: true});
         } else if (ticket.useradmin == 'V') {
-          permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype:'SHARED_DATA', inherit: true});
+          //permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype:'SHARED_DATA', inherit: true});
           if (nt.isSetSessionParam(ticket.req.sessionId, '4v')) { // Vendor Terminal
-            permittedResourcesFilters.push({company:sid.companyId, user:null, project:null, rtype:'TOOLS_DATA', inherit: true});
-            permittedResourcesFilters.push({company:sid.companyId, user:null, project:null, rtype:'IP_DATA', inherit: true});
+            permittedResourcesFilters.push({company:sid.companyId, user:null, project:null, rtype:'TOOLS_DATA', explicit: false, inherit: true});
+            permittedResourcesFilters.push({company:sid.companyId, user:null, project:null, rtype:'IP_DATA', explicit: false, inherit: true});
           }
         }
         // Get shares in order to allow company admin to have write access to companies mounts.
@@ -1501,17 +1512,28 @@ function startMaster(ticket, cb) {
           if (err) {
             logger.log('ERROR: There was an error while fetching quotashares. Machine might launch without all external disks');
           }
+          var removedIds;
           adminIds = [];
           if (admindata) {
-            adminIds = adminIds.concat( admindata['SHARED_DATA'] || []);
+            //adminIds = adminIds.concat( admindata['SHARED_DATA'] || []);
             adminIds = adminIds.concat( admindata['TOOLS_DATA'] || []);
             adminIds = adminIds.concat( admindata['IP_DATA'] || []);
+            removedIds = _.remove(adminIds, function(x) { return x.perm === 0;}); // remove Ids with no access permission
+            if (removedIds.length) {
+              logger.log('Removed Mount adminIds: '+util.inspect(removedIds, {depth: null}));
+            }
           }
 
-          allIds = allIds.concat(adminIds);
-          allIds = _.uniq(allIds);
+          allIds = quotashares.uniq(allIds);
+          //allIds = quotashares.addOrReplaceAdminMounts(allIds, adminIds); // add or replace admin ids
+          removedIds = _.remove(allIds, function(x) { return x.perm === 0;}); // remove Ids with no access permission
+          if (removedIds.length) {
+            logger.log('Removed Mount Ids : '+util.inspect(removedIds, {depth: null}));
+          }
 
-          shares.getByIds(mysqlClient, allIds, function(err, projectShares) { // FIXME : if multiple clouds are introduced, add cloudId.
+          var joinedIds = allIds.concat(adminIds);
+          // map: allIds have permissions too, get only ids
+          shares.getByIds(mysqlClient, _.uniq(joinedIds.map(function(x) {return x.id;})), function(err, projectShares) { // FIXME : if multiple clouds are introduced, add cloudId.
 
             mysqlClient.release();
 
@@ -1521,9 +1543,22 @@ function startMaster(ticket, cb) {
                 var notfound = true;
                 var j;
                 var mntp=n;
+                var perm;
+
+                perm = quotashares.getPermission(allIds, n.id);
+                switch (perm) {
+                  case 2 : // rw
+                    mntp.mountParams = ro2rw(mntp.mountParams);
+                    break;
+                  case 1 : // ro
+                    mntp.mountParams = rw2ro(mntp.mountParams);
+                    break;
+                  default:
+                    break;
+                }
 
                 if ((ticket.useradmin == 'C') || (ticket.useradmin == 'V')) { // Allow company admin to have write access to companies mounts.
-                  if (adminIds.indexOf(''+n.id) !== -1) {
+                  if (quotashares.getPermission(adminIds, n.id) !== null) { // TODO: old style quota system
                     mntp.mountParams = ro2rw(mntp.mountParams);
                   }
                 }
@@ -1542,7 +1577,7 @@ function startMaster(ticket, cb) {
                   }
                 }
 
-                for (j=0; j<allShares.length; j++) {
+                for (j = 0; j < allShares.length; j++) {
                   if ((mntp.fstype == allShares[j].fstype) && (mntp.location == allShares[j].location) &&
                       (mntp.mountPoint == allShares[j].mountPoint) && (mntp.mountParams == allShares[j].mountParams)) {
                     notfound = false;
@@ -1554,41 +1589,7 @@ function startMaster(ticket, cb) {
               });
 
               allShares = _.uniqWith(allShares, function(a, b) { return a.uuid === b.uuid;});
-
-              userData['reqSessionId'] = ticket.req.sessionId;
-              userData['machineType'] = hubType;
-              userData['hubServer'] = hubProtocol + '://' + hubHost + ':' + hubPort;
-              if ((setloginuser) && (ticket.loginuser !== 'nefelus')) {
-                userData['USERDEF'] = ticket.loginuser;
-              }
-              userData['UUID'] = ticket.uuid;
-              userData['JOBTYPE'] = ticket.req.jobType;
-              userData['RESOLUTION'] = ticket.XResolution;
-              userData['DISPLAY'] = ticket.XDisplay;
-
-              if (setsecgroups) {
-                var iptables = secgroups.getRules(sid.companyId, sid.projectId); // FIXME : if multiple clouds are introduced, add cloudId.
-                if (iptables.length > 0) {
-                  iptables.forEach(function(n, i) {
-                    //'sec_group_id':1,'company_id':0,'project_id':0,'id':1,'direction':'I','interface':'eth0','protocol':'tcp','address':'*','ports':'22','condition':'*'
-                    n.condition=n.condition.trim();
-                    logger.log(ticket.req.sessionId+': Sec Group Rule= '+ n.direction + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports+ ' ' + n.condition);
-                    userData['sr' + i] = n.direction.toUpperCase() + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports + ' ' + ((n.condition !== '') ? n.condition : '*');
-                  });
-                }
-                if (ticket.licenseManager !== '') {
-                  ticket.licenseManager.split(':').forEach(function(licenseManager, i) {
-                    var lmp = ticket.licenseManager.replace(/@.*/,'');
-                    var lma = ticket.licenseManager.replace(/.*@/,'');
-                    userData['srLM'+i] = 'E eth0 tcp ' + lma + ' ' + lmp + ' *';
-                  });
-                }
-              }
-
-              if (! vncLocalOnly) {
-                userData['vncLocalOnly'] = 'NO';
-              }
-              userData['xterm'] = toolXtermSupport;
+              allShares = _.sortBy(allShares, ['mountPoint']);
 
               userData['totalshares'] = allShares.length;
               ticket.setDynamicNFSShare('resetshares', null);
@@ -1631,6 +1632,41 @@ function startMaster(ticket, cb) {
                   userData['p' + fstype + 'fs' + i] = (((n.mountParams!==null) && (n.mountParams!=='')) ? (n.mountParams) : 'ro')+fsExtraParams;
                 }
               });
+
+              userData['reqSessionId'] = ticket.req.sessionId;
+              userData['machineType'] = hubType;
+              userData['hubServer'] = hubProtocol + '://' + hubHost + ':' + hubPort;
+              if ((setloginuser) && (ticket.loginuser !== 'nefelus')) {
+                userData['USERDEF'] = ticket.loginuser;
+              }
+              userData['UUID'] = ticket.uuid;
+              userData['JOBTYPE'] = ticket.req.jobType;
+              userData['RESOLUTION'] = ticket.XResolution;
+              userData['DISPLAY'] = ticket.XDisplay;
+
+              if (setsecgroups) {
+                var iptables = secgroups.getRules(sid.companyId, sid.projectId); // FIXME : if multiple clouds are introduced, add cloudId.
+                if (iptables.length > 0) {
+                  iptables.forEach(function(n, i) {
+                    //'sec_group_id':1,'company_id':0,'project_id':0,'id':1,'direction':'I','interface':'eth0','protocol':'tcp','address':'*','ports':'22','condition':'*'
+                    n.condition=n.condition.trim();
+                    logger.log(ticket.req.sessionId+': Sec Group Rule= '+ n.direction + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports+ ' ' + n.condition);
+                    userData['sr' + i] = n.direction.toUpperCase() + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports + ' ' + ((n.condition !== '') ? n.condition : '*');
+                  });
+                }
+                if (ticket.licenseManager !== '') {
+                  ticket.licenseManager.split(':').forEach(function(licenseManager, i) {
+                    var lmp = ticket.licenseManager.replace(/@.*/,'');
+                    var lma = ticket.licenseManager.replace(/.*@/,'');
+                    userData['srLM'+i] = 'E eth0 tcp ' + lma + ' ' + lmp + ' *';
+                  });
+                }
+              }
+
+              if (! vncLocalOnly) {
+                userData['vncLocalOnly'] = 'NO';
+              }
+              userData['xterm'] = toolXtermSupport;
 
               // encrypt and send SSL certificates
               // FIXME : Run this in hub init.d : cat /var/log/messages > /dev/urandom; ifconfig > /dev/urandom
