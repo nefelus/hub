@@ -1885,13 +1885,15 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
               if (data.Instances[m].InstanceId) {
                 if ((data.Instances[m].State) && (data.Instances[m].State.Name) && (data.Instances[m].State.Name === 'error')) {
                   logger.log(sessionId + ' RunInstances: instance ' + data.Instances[m].InstanceId + ' launched with State = error');
+                  KillMachines(data.Instances[m].InstanceId, function(){});
                 } else {
                   instanceIds.push(data.Instances[m].InstanceId);
-                  ready = true;
                 }
+                ready = true;
               }
             }
-          } else {
+          }
+          if (instanceIds.length === 0) {
             noResources = true;
           }
           if (ready) {
