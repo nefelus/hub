@@ -1864,18 +1864,18 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
         if (err) {
           if  ((err.statusCode) && (err.statusCode == 400) && (err.code) && (err.code === 'InvalidAMIID.NotFound')) {
             ready = false;
-            logger.log('RunInstances: ' + err.code + ' '+ ((err.message) ? err.message : 'unknown error'));
+            logger.log(sessionId + ' RunInstances: ' + err.code + ' '+ ((err.message) ? err.message : 'unknown error'));
             callback(null);
             return;
           } else if (((err.statusCode) && (err.statusCode == 413) && (err.code) && (err.code === 'ResourceLimitExceeded')) ||
               ((err.statusCode) && (err.statusCode == 403) && (err.code) && (err.code === 'Forbidden') && (err.message) && (err.message.match(/^Quota exceeded/) !== null))) {
             ready = true;
             noResources = true;
-            logger.log('RunInstances: ' + ((err.message) ? err.message : 'unknown error'));
+            logger.log(sessionId + ' RunInstances: ' + ((err.message) ? err.message : 'unknown error'));
             callback(null);
             return;
           } else {
-            logger.log('RunInstances error ', JSON.stringify(err));
+            logger.log(sessionId + ' RunInstances error ', JSON.stringify(err));
             setTimeout(function() {callback(null);}, EC2_TIMEOUT);
             return;
           }
@@ -1883,8 +1883,12 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
           if (data.Instances) {
             for (var m = 0; m < data.Instances.length; m++) {
               if (data.Instances[m].InstanceId) {
-                instanceIds.push(data.Instances[m].InstanceId);
-                ready = true;
+                if ((data.Instances[m].State) && (data.Instances[m].State.Name) && (data.Instances[m].State.Name === 'error')) {
+                  logger.log(sessionId + ' RunInstances: instance ' + data.Instances[m].InstanceId + ' launched with State = error');
+                } else {
+                  instanceIds.push(data.Instances[m].InstanceId);
+                  ready = true;
+                }
               }
             }
           } else {
@@ -2097,6 +2101,7 @@ function associateNextFreeAddress(instanceId, auto, cb) {
               addressAssociated = true;
               callback(null);
             } else {
+              logger.log('associateAddress: ' + ((err.code) ? err.code : '') + ' ' + err.message);
               setTimeout(function() {callback(null);}, EC2_TIMEOUT);
             }
           });
@@ -2143,6 +2148,9 @@ function getFreeAddress(cb) {
             setTimeout(function() {callback(null);}, EC2_TIMEOUT);
           }
         } else {
+          if (err.message) {
+            logger.log('describeAddresses: ' + ((err.code) ? err.code : '') + ' ' + err.message);
+          }
           setTimeout(function() {callback(null);}, EC2_TIMEOUT);
         }
       });
