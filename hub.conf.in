@@ -121,7 +121,7 @@ homeBlacklistPatterns = [ "!/home/nefelus/.Xauthority"
 
 # Definitions for VM Dashboard and log viewer access
 [vm.logURL]
-port = 8998
+port = "8998"
 protocol = "https"
 
 # Definitions for VNC console access
