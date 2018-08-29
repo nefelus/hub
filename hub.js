@@ -505,9 +505,9 @@ function loadConfig() {
   logURLproto = mainconf.get('vm:logURL:protocol');
   vncURLproto = mainconf.get('vm:vncURL:protocol');
   cmdURLproto = mainconf.get('vm:cmdURL:protocol');
-  logURLport = mainconf.get('vm:logURL:port');
-  vncURLport = mainconf.get('vm:vncURL:port');
-  cmdURLport = mainconf.get('vm:cmdURL:port');
+  logURLport = mainconf.get('vm:logURL:port') || "8998";
+  vncURLport = mainconf.get('vm:vncURL:port') || "8997";
+  cmdURLport = mainconf.get('vm:cmdURL:port') || "8996";
   noVNCdebug = mainconf.get('vm:vncURL:debug') || false;
   x11IdleTimeout = mainconf.get('vm:x11IdleTimeout');
   homeBlacklistPatterns = mainconf.get('vm:homeBlacklistPatterns') || [];
@@ -1634,6 +1634,7 @@ function startMaster(ticket, cb) {
               });
 
               userData['reqSessionId'] = ticket.req.sessionId;
+              userData['PORTS'] = vncURLport+','+cmdURLport+','+logURLport
               userData['machineType'] = hubType;
               userData['hubServer'] = hubProtocol + '://' + hubHost + ':' + hubPort;
               if ((setloginuser) && (ticket.loginuser !== 'nefelus')) {
