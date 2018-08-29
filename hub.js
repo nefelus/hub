@@ -1453,11 +1453,13 @@ function startMaster(ticket, cb) {
   if (nt.isSetSessionParam(ticket.req.sessionId, '4d')) { // Allow only documentation viewing.
     dataTypes = ['IP_DOCS', 'TOOL_DOCS'];
   } else {
-    dataTypes = ['USER_DATA', 'IP_DATA_LIB'];
+    dataTypes = ['USER_DATA', 'IP_DATA', 'IP_DATA_LIB'];
   }
   var permittedResourcesFilters = [];
   dataTypes.forEach(function(dt) {
-    permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype: dt, explicit: (dt === 'USER_DATA'), inherit:(dt !== 'USER_DATA')});
+    var explicit = ((['IP_DATA', 'IP_DATA_LIB'].indexOf(dt) !== -1) || (dt === 'USER_DATA'));
+    var inherit = ! explicit;
+    permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype: dt, explicit: explicit, inherit: inherit});
   });
 
   var runasSid = nt.parseSessionId(ticket.req.runas);
@@ -1504,7 +1506,7 @@ function startMaster(ticket, cb) {
           //permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype:'SHARED_DATA', inherit: true});
           if (nt.isSetSessionParam(ticket.req.sessionId, '4v')) { // Vendor Terminal
             permittedResourcesFilters.push({company:sid.companyId, user:null, project:null, rtype:'TOOLS_DATA', explicit: false, inherit: true});
-            permittedResourcesFilters.push({company:sid.companyId, user:null, project:null, rtype:'IP_DATA', explicit: false, inherit: true});
+            //permittedResourcesFilters.push({company:sid.companyId, user:null, project:null, rtype:'IP_DATA', explicit: false, inherit: true});
           }
         }
         // Get shares in order to allow company admin to have write access to companies mounts.
@@ -1517,7 +1519,7 @@ function startMaster(ticket, cb) {
           if (admindata) {
             //adminIds = adminIds.concat( admindata['SHARED_DATA'] || []);
             adminIds = adminIds.concat( admindata['TOOLS_DATA'] || []);
-            adminIds = adminIds.concat( admindata['IP_DATA'] || []);
+            //adminIds = adminIds.concat( admindata['IP_DATA'] || []);
             removedIds = _.remove(adminIds, function(x) { return x.perm === 0;}); // remove Ids with no access permission
             if (removedIds.length) {
               logger.log('Removed Mount adminIds: '+util.inspect(removedIds, {depth: null}));
