@@ -1592,6 +1592,7 @@ function startMaster(ticket, cb) {
 
               allShares = _.uniqWith(allShares, function(a, b) { return a.uuid === b.uuid;});
               allShares = _.sortBy(allShares, ['mountPoint']);
+              allShares =  filterOutSubdirs(allShares); // Remove mountpoints that are subdirs with the same mount params.
 
               userData['totalshares'] = allShares.length;
               ticket.setDynamicNFSShare('resetshares', null);
@@ -4162,4 +4163,35 @@ function getCompaniesCredit(sqlpool, companyIds, cb) {
     return;
   }
 
+}
+
+function filterOutSubdirs(arr) {
+  var lastused = 0;
+  var todel = [];
+  var issub;
+  var isSubDir = function (a, b) {
+    a = a.replace(/\/*$/,'')+'/';
+    b = b.replace(/\/*$/,'')+'/';
+    if (b.indexOf(a) === 0) {
+      return true;
+    }
+    return false;
+  }
+
+  for (var a = 1; a < arr.length; a++) {
+    issub = isSubDir(arr[lastused].mountPoint, arr[a].mountPoint);
+    if (issub === false) {
+      lastused = a;
+    } else {
+      if (arr[a].mountParams === arr[lastused].mountParams) {
+        todel.push(a);
+      }
+    }
+  }
+
+  for (a=todel.length - 1; a > -1; a--) {
+    arr.splice( todel[a], 1);
+  }
+
+  return arr;
 }
