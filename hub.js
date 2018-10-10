@@ -659,7 +659,7 @@ function Ticket(id) {
     'clean' : false
   };
 
-  this.uuid = UUID.v4();
+  this.uuid = UUID();
 
   this.req = {
     sessionId : '',
