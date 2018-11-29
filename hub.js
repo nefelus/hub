@@ -180,6 +180,7 @@ var cmdURLproto;
 var logURLport;
 var vncURLport;
 var cmdURLport;
+var personaliseConsoleURLs;
 var noVNCdebug;
 var x11IdleTimeout;
 var homeBlacklistPatterns = [];
@@ -309,7 +310,8 @@ function loadConfig() {
             ssl : false,
             ignoreInstallationIdInFilemanagerOps : false,
             hasAutoAssignFloatingIp : true,
-            logHeartBeats : true
+            logHeartBeats : true,
+            vm : {personaliseConsoleURLs: false}
           });
 
   timezone = mainconf.get('timezone') || null;
@@ -508,6 +510,7 @@ function loadConfig() {
   logURLport = mainconf.get('vm:logURL:port') || "8998";
   vncURLport = mainconf.get('vm:vncURL:port') || "8997";
   cmdURLport = mainconf.get('vm:cmdURL:port') || "8996";
+  personaliseConsoleURLs = mainconf.get('vm:personaliseConsoleURLs');
   noVNCdebug = mainconf.get('vm:vncURL:debug') || false;
   x11IdleTimeout = mainconf.get('vm:x11IdleTimeout');
   homeBlacklistPatterns = mainconf.get('vm:homeBlacklistPatterns') || [];
@@ -640,6 +643,9 @@ function Ticket(id) {
   this.vncConsole = null;
   this.loginuser = 'nefelus';
   this.useradmin = '';
+  this.pendingWatcherIds = '';
+  this.pendingEditorIds = '';
+  this.pendingCollaborators = '';
 
   this.dynamicNFSShares = {
     activated : false,
@@ -669,6 +675,8 @@ function Ticket(id) {
     machineCount : 1,
     threadCount : null,
     instanceType : null,
+    watcherIds : '',
+    editorIds : '',
     ami : null,
     commandFile : '',
     runningDir : '',
@@ -1558,7 +1566,7 @@ function startMaster(ticket, cb) {
                   default:
                     break;
                 }
-                
+
                 if ((ticket.useradmin == 'C') || (ticket.useradmin == 'V')) { // Allow company admin to have write access to companies mounts.
                   if (quotashares.getPermission(adminIds, n.id) !== null) { // TODO: old style quota system
                     mntp.mountParams = ro2rw(mntp.mountParams);
@@ -2274,13 +2282,31 @@ function recoverTicketFromInternalState(mysqlPool, key, id, cb) {
 }
 
 var parseAck = function(ack) {
-// From master : Ack({'sessionId':sessionId, 'ticketId' : ticket.id, 'status' : 'xyz'}); // Acknowledge
+// From master : Ack({'sessionId':sessionId, 'ticketId' : ticket.id, 'status' : 'xyz', error: '', payload: {}}); // Acknowledge
   if (nt.isSafeJSON(ack)) {
     var msg = JSON.parse(ack);
     var myticket = getTicketIdBySessionId(msg.sessionId);
+    if (msg.error) {
+      logger.log(msg.sessionId+': Error: '+msg.error);
+    }
     if (myticket !== null) {
-      if (_.indexOf(sessionStatusCodes, Tickets[myticket].get('sessionStatus')) < _.indexOf(sessionStatusCodes, msg.status)) {
-        Tickets[myticket].set('sessionStatus', msg.status);
+      if (msg.status === 'console_access') {
+        if (msg.error) {
+          logger.log(msg.sessionId+': Error setting console access ('+msg.error+')');
+        } else {
+          // set watchers and editors in ticket.
+          var pwi = Tickets[myticket].get('pendingWatcherIds');
+          var pei = Tickets[myticket].get('pendingEditorIds');
+          if ((msg.payload) && (msg.payload.users) && (pwi === msg.payload.users.watchers) && (pei === msg.payload.users.editors)) {
+            Tickets[myticket].set('pendingWatcherIds', '');
+            Tickets[myticket].set('pendingEditorIds', '');
+            Tickets[myticket].set('pendingCollaborators', '');
+          }
+        }
+      } else {
+        if (_.indexOf(sessionStatusCodes, Tickets[myticket].get('sessionStatus')) < _.indexOf(sessionStatusCodes, msg.status)) {
+          Tickets[myticket].set('sessionStatus', msg.status);
+        }
       }
     }
   } else {
@@ -2382,8 +2408,60 @@ var dispatcher = function dispatcher () {
               }
               pendingFound = true;
               break;
+            case 'RUNNING' : // FIXME: handle watchers.
+              if (personaliseConsoleURLs) {
+                (function() {
+                  var runningSessionId = records[i].SESSION_ID;
+                  var runningReqId = records[i].ID;
+                  var runningSession = getTicketIdBySessionId(runningSessionId);
+                  if (runningSession) {
+                    var runningTicket = Tickets[runningSession];
+                    var currentWatcherIds = runningTicket.getRequest('watcherIds');
+                    var currentEditorIds = runningTicket.getRequest('editorIds');
+                    var watcherIds = records[i].WATCH_ID_LIST || '';
+                    var editorIds = records[i].EDIT_ID_LIST || '';
+                    if ((currentWatcherIds !== watcherIds) || (currentEditorIds !== editorIds)) {
+                      getCollaborators(watcherIds, editorIds, function(err, data) {
+                        if (!err) {
+                          runningTicket.setRequest('watcherIds', watcherIds);
+                          runningTicket.setRequest('editorIds', editorIds);
+
+                          runningTicket.set('pendingWatcherIds', watcherIds);
+                          runningTicket.set('pendingEditorIds', editorIds);
+                          runningTicket.set('pendingCollaborators', data);
+                          var peer = runningTicket.getMaster('socket');
+                          if (peer !== null) {
+                            var masterTicket = dupTicket(runningTicket.get('id'));
+                            var msg = {'reqId' : runnningReqId, 'sessionId' : runningSessionId, 'ticket' : masterTicket, users: {watchers: watcherIds, editors: editorIds, data: data}};
+                            logger.log(runningSessionId + ': SENT ' + 'console_access' + ' to '+peer);
+
+                            sendToPeer(peer, 'console_access', JSON.stringify(msg));
+                          }
+                        } else {
+                          logger.log('Error getting collaborators');
+                        }
+                      });
+                    } else {
+                      var currentPendingWatcherIds = runningTicket.get('pendingWatcherIds');
+                      var currentPendingEditorIds = runningTicket.get('pendingEditorIds');
+                      var pendingCollaborators = runningTicket.get('pendingCollaborators');
+
+                      if ((currentPendingWatcherIds !== '') || (currentEditorIds !== '')) {
+                        var peer = runningTicket.getMaster('socket');
+                        if (peer !== null) {
+                          var masterTicket = dupTicket(runningTicket.get('id'));
+                          var msg = {'reqId' : runnningReqId, 'sessionId' : runningSessionId, 'ticket' : masterTicket, users: {watchers: currentPendingWatcherIds, editors: currentPendingEditorIds, data: pendingCollaborators}};
+                          logger.log(runningSessionId + ': SENT ' + 'console_access' + ' to '+peer);
+
+                          sendToPeer(peer, 'console_access', JSON.stringify(msg));
+                        }
+                      }
+                    }
+                  }
+                })();
+              }
+              // don't break here!!!!!!!
             case 'SETUP'   :
-            case 'RUNNING' :
             case 'CLOSING' :
               if ( rows[i]['COMMAND'].substr(0,5) == 'EXEC_') {
                 if (machineId !== 0 ) {
@@ -2556,6 +2634,9 @@ var dispatcher = function dispatcher () {
                                         t.setRequest('runningDir', runningDir);
                                         t.setRequest('licenseManager', licenseManager);
                                         t.setRequest('jobType', jobType);
+                                        t.setRequest('watcherIds', records[i].WATCH_ID_LIST || '');
+                                        t.setRequest('editorIds', records[i].EDIT_ID_LIST || '');
+
                                         t.set('XDisplay', XDisplay);
                                         t.set('XResolution', XResolution);
                                         t.set('useradmin', useradmin);
@@ -2877,7 +2958,7 @@ io.on('connection', function (socket) {
         logURL = (logURL != '') ?  logURLproto + '://' + logURL + ':' + logURLport + '?token=' + Tickets[myticket].get('uuid') : '';
 
         if (jobType == 'interactive') {
-          var vncURLargs = '/#autoconnect=true&password=' + Tickets[myticket].get('uuid') + '&title=Nefelus%20-%20' + (sessionId.split('_')[4] || 'VNC.Console');
+          var vncURLargs = '/?autoconnect=true&password=' + Tickets[myticket].get('uuid') + '&title=Nefelus%20-%20' + (sessionId.split('_')[4] || 'VNC.Console');
           vncURLargs += (noVNCdebug === true) ? '&logging=debug' : '';
           vncURL = (vncURL != '') ?  vncURLproto + '://' + vncURL + ':' + vncURLport + vncURLargs : '';
         } else if (jobType == 'prompt') {
@@ -2917,7 +2998,7 @@ io.on('connection', function (socket) {
                               clearInterval(Tickets[myticket].consoleCheckTimer);
                               Tickets[myticket].consoleCheckTimer = null;
                               updateStatus(mysqlPool, reqID, 'RUNNING', mysqlKeys, mysqlValues);
-                              logger.log(sessionId + ': LOG URL: ' + Tickets[myticket].logConsole);
+                              logger.log(sessionId + ': LOG VIEWER: ' + Tickets[myticket].logConsole);
                               if (Tickets[myticket].vncConsole !== '') {
                                 logger.log(sessionId + ': VNC VIEWER: ' + Tickets[myticket].vncConsole);
                               }
@@ -3324,6 +3405,21 @@ io.on('connection', function (socket) {
 
 });
 
+function sendToPeer(peer, type, msg) {
+  // Send to particular socket
+  // for new socket.io see : https://github.com/socketio/socket.io/issues/1618
+  // or io.to(peer).emit() might work...
+  if (io.sockets.connected[peer]) {
+    io.sockets.connected[peer].emit(type, msg, parseAck);
+  } else {
+    try {
+      io.to(peer).emit(type, msg, parseAck);
+    } catch (eio) {
+      logger.log('Socket '+peer+' is not found in connected peers.');
+    }
+  }
+}
+
 function middleSessionOperation(type, id, sid, sqlpool, status,  msgParams) {
   var mysqlKeys;
   var mysqlValues;
@@ -3343,18 +3439,8 @@ function middleSessionOperation(type, id, sid, sqlpool, status,  msgParams) {
         }
       }
 
-      // Send to particular socket
-      // for new socket.io see : https://github.com/socketio/socket.io/issues/1618
-      // or io.to(peer).emit() might work...
-      if (io.sockets.connected[peer]) {
-        io.sockets.connected[peer].emit(type, JSON.stringify(msg), parseAck);
-      } else {
-        try {
-          io.to(peer).emit(type, JSON.stringify(msg), parseAck);
-        } catch (eio) {
-          logger.log('Socket '+peer+' is not found in connected peers.');
-        }
-      }
+      sendToPeer(peer, type, JSON.stringify(msg));
+
       updateStatus(sqlpool, id, status);
     } else {
       logger.log('Remote socket for session ' + sid + ' not found');
@@ -3877,7 +3963,33 @@ function handleHello(socket, instanceId, ticket, msg) {
     socket.nefsessionId = sessionId;
     socket.nefhostname = servername;
     if (Tickets[ticket].get('cancelPending') === false) {
+
       socket.emit('welcome', JSON.stringify(mesg), parseAck);
+
+      if (personaliseConsoleURLs) {
+        // get watchers and editors uuids and compose user access record
+        // put in mesg.users and send it to worker to setup console access usersfile
+
+        var watcherIds = Tickets[ticket].getRequest('watcherIds');
+        var editorIds = Tickets[ticket].getRequest('editorIds');
+        getCollaborators(watcherIds, editorIds, function(err, data) {
+          if (!err) {
+            Tickets[ticket].setRequest('watcherIds', watcherIds);
+            Tickets[ticket].setRequest('editorIds', editorIds);
+
+            Tickets[ticket].set('pendingWatcherIds', watcherIds);
+            Tickets[ticket].set('pendingEditorIds', editorIds);
+            Tickets[ticket].set('pendingCollaborators', data);
+            masterTicket = dupTicket(reqID);
+            var msg = {'reqId' : reqID, 'sessionId' : sessionId, 'ticket' : masterTicket, users: {watchers: watcherIds, editors: editorIds, data: data}};
+            logger.log(sessionId + ': SENT ' + 'console_access' + ' to '+socket.id);
+
+            socket.emit('console_access', JSON.stringify(msg), parseAck);
+          } else {
+            logger.log('Error getting collaborators');
+          }
+        });
+      }
     }
   } else {
     recoverTicketFromInternalState(mysqlPool, 'INSTANCE_ID', instanceId, function (err, data) {
@@ -4194,4 +4306,55 @@ function filterOutSubdirs(arr) {
   }
 
   return arr;
+}
+
+function sendSessionCollaborators(ticket, id, sid, data) {
+  var peer = activeTicket.getMaster('socket');
+  if (peer !== null) {
+    var msg = {'reqId' : id, 'sessionId' : sid, 'ticket' : masterTicket};
+    //logger.log(sid + ': SENT console_access to '+peer);
+
+    sendToPeer(peer, 'console_access', JSON.stringify(msg));
+
+  }
+}
+
+function getCollaborators(watchListIds, editListIds, cb) {
+  if (mysqlPool !== null) {
+    mysqlPool.getConnection(function(err, mysqlClient) {
+      if (err) {
+        logger.log(err);
+        cb(err, null);
+        return;
+      }
+
+      mysqlClient.query(SQL.getCollaborators [watchListIds, editListIds], function(err, rows, fields) {
+
+        mysqlClient.release();
+
+        if (err) {
+          logger.log('Error from MYSQL query:');
+          logger.log(err);
+          cb(err, '');
+          return;
+        }
+        if (rows.length) {
+          var users = rows[0].COLLABORATORS || '';
+          if (users.length === 0) {
+            users = [];
+          } else {
+            users = users.split(',');
+
+            users = users.map(function(u, i) {
+              u = u.split(':');
+              return {username: u[0], mode: u[1] || 'ro', name: u[2] || '', uuid: u[3] || ''};
+            });
+          }
+          cb(null, users);
+        } else {
+          cb(null, []);
+        }
+      });
+    });
+  }
 }

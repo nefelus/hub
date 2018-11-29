@@ -72,6 +72,8 @@ username = "nefelus"
 masterDebug = true
 heartbeatInterval = 60000
 x11IdleTimeout = 0
+# Send list of allowed watchers and editors of a session to VM in order to be able to control access to VM consoles
+personaliseConsoleURLs = false
 # set the size of VM's root volume (applicable only at Amazon, OpenStack does not support it yet)
 # if set to zero the image snapshot size is used.
 rootVolumeSize = 0
