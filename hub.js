@@ -4308,17 +4308,6 @@ function filterOutSubdirs(arr) {
   return arr;
 }
 
-function sendSessionCollaborators(ticket, id, sid, data) {
-  var peer = activeTicket.getMaster('socket');
-  if (peer !== null) {
-    var msg = {'reqId' : id, 'sessionId' : sid, 'ticket' : masterTicket};
-    //logger.log(sid + ': SENT console_access to '+peer);
-
-    sendToPeer(peer, 'console_access', JSON.stringify(msg));
-
-  }
-}
-
 function getCollaborators(watchListIds, editListIds, cb) {
   if (mysqlPool !== null) {
     mysqlPool.getConnection(function(err, mysqlClient) {
