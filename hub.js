@@ -645,7 +645,7 @@ function Ticket(id) {
   this.useradmin = '';
   this.pendingWatcherIds = '';
   this.pendingEditorIds = '';
-  this.pendingCollaborators = '';
+  this.pendingCollaborators = [];
 
   this.dynamicNFSShares = {
     activated : false,
@@ -2300,7 +2300,7 @@ var parseAck = function(ack) {
           if ((msg.payload) && (msg.payload.users) && (pwi === msg.payload.users.watchers) && (pei === msg.payload.users.editors)) {
             Tickets[myticket].set('pendingWatcherIds', '');
             Tickets[myticket].set('pendingEditorIds', '');
-            Tickets[myticket].set('pendingCollaborators', '');
+            Tickets[myticket].set('pendingCollaborators', []);
           }
         }
       } else {
@@ -2411,15 +2411,17 @@ var dispatcher = function dispatcher () {
             case 'RUNNING' : // FIXME: handle watchers.
               if (personaliseConsoleURLs) {
                 (function() {
-                  var runningSessionId = records[i].SESSION_ID;
-                  var runningReqId = records[i].ID;
+                  var runningSessionId = rows[i].SESSION_ID;
+                  var runningReqId = rows[i].ID;
                   var runningSession = getTicketIdBySessionId(runningSessionId);
                   if (runningSession) {
                     var runningTicket = Tickets[runningSession];
                     var currentWatcherIds = runningTicket.getRequest('watcherIds');
                     var currentEditorIds = runningTicket.getRequest('editorIds');
-                    var watcherIds = records[i].WATCH_ID_LIST || '';
-                    var editorIds = records[i].EDIT_ID_LIST || '';
+                    var watcherIds = rows[i].WATCH_ID_LIST+'' || '';
+                    var editorIds = rows[i].EDIT_ID_LIST+'' || '';
+                    watcherIds = watcherIds.replace(/,$/, '');
+                    editorIds = editorIds.replace(/,$/, '');
                     if ((currentWatcherIds !== watcherIds) || (currentEditorIds !== editorIds)) {
                       getCollaborators(watcherIds, editorIds, function(err, data) {
                         if (!err) {
@@ -2432,7 +2434,7 @@ var dispatcher = function dispatcher () {
                           var peer = runningTicket.getMaster('socket');
                           if (peer !== null) {
                             var masterTicket = dupTicket(runningTicket.get('id'));
-                            var msg = {'reqId' : runnningReqId, 'sessionId' : runningSessionId, 'ticket' : masterTicket, users: {watchers: watcherIds, editors: editorIds, data: data}};
+                            var msg = {'reqId' : runningReqId, 'sessionId' : runningSessionId, 'ticket' : masterTicket, users: {watchers: watcherIds, editors: editorIds, data: data}};
                             logger.log(runningSessionId + ': SENT ' + 'console_access' + ' to '+peer);
 
                             sendToPeer(peer, 'console_access', JSON.stringify(msg));
@@ -2446,11 +2448,11 @@ var dispatcher = function dispatcher () {
                       var currentPendingEditorIds = runningTicket.get('pendingEditorIds');
                       var pendingCollaborators = runningTicket.get('pendingCollaborators');
 
-                      if ((currentPendingWatcherIds !== '') || (currentEditorIds !== '')) {
+                      if ((currentPendingWatcherIds !== '') || (currentPendingEditorIds !== '')) {
                         var peer = runningTicket.getMaster('socket');
                         if (peer !== null) {
                           var masterTicket = dupTicket(runningTicket.get('id'));
-                          var msg = {'reqId' : runnningReqId, 'sessionId' : runningSessionId, 'ticket' : masterTicket, users: {watchers: currentPendingWatcherIds, editors: currentPendingEditorIds, data: pendingCollaborators}};
+                          var msg = {'reqId' : runningReqId, 'sessionId' : runningSessionId, 'ticket' : masterTicket, users: {watchers: currentPendingWatcherIds, editors: currentPendingEditorIds, data: pendingCollaborators}};
                           logger.log(runningSessionId + ': SENT ' + 'console_access' + ' to '+peer);
 
                           sendToPeer(peer, 'console_access', JSON.stringify(msg));
@@ -2623,6 +2625,10 @@ var dispatcher = function dispatcher () {
                                         var loginuser = records[i].LOGIN_NAME || 'nefelus';
                                         var useradmin = records[i].USER_ADMIN || '';
                                         var licenseManager = records[i].LICENSE_MANAGER || '';
+                                        var watcherIds = records[i].WATCH_ID_LIST+'' || '';
+                                        var editorIds = records[i].EDIT_ID_LIST+'' || '';
+                                        watcherIds = watcherIds.replace(/,$/, '');
+                                        editorIds = editorIds.replace(/,$/, '');
                                         var t = new Ticket(hubreqid);
                                         t.setRequest('sessionId', sessionId);
                                         t.setRequest('runas', runas);
@@ -2634,8 +2640,8 @@ var dispatcher = function dispatcher () {
                                         t.setRequest('runningDir', runningDir);
                                         t.setRequest('licenseManager', licenseManager);
                                         t.setRequest('jobType', jobType);
-                                        t.setRequest('watcherIds', records[i].WATCH_ID_LIST || '');
-                                        t.setRequest('editorIds', records[i].EDIT_ID_LIST || '');
+                                        t.setRequest('watcherIds', watcherIds);
+                                        t.setRequest('editorIds', editorIds);
 
                                         t.set('XDisplay', XDisplay);
                                         t.set('XResolution', XResolution);
@@ -4313,22 +4319,22 @@ function getCollaborators(watchListIds, editListIds, cb) {
     mysqlPool.getConnection(function(err, mysqlClient) {
       if (err) {
         logger.log(err);
-        cb(err, null);
+        cb(err, []);
         return;
       }
 
-      mysqlClient.query(SQL.getCollaborators [watchListIds, editListIds], function(err, rows, fields) {
+      mysqlClient.query(SQL.getCollaborators, [editListIds, watchListIds], function(err, rows, fields) {
 
         mysqlClient.release();
 
         if (err) {
           logger.log('Error from MYSQL query:');
           logger.log(err);
-          cb(err, '');
+          cb(err, []);
           return;
         }
         if (rows.length) {
-          var users = rows[0].COLLABORATORS || '';
+          var users = rows[0].COLLABORATORS+'' || '';
           if (users.length === 0) {
             users = [];
           } else {
