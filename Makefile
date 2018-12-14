@@ -9,13 +9,15 @@ CONFIGS = hub.conf.in nefelus.conf.in
 
 OBFUSCATOR_PARAMS = --disableConsoleOutput false --selfDefending true --stringArray true --stringArrayEncoding base64 --stringArrayThreshold 0.75 --debugProtection true --debugProtectionInterval false --controlFlowFlattening true --controlFlowFlatteningThreshold 0.75
 
+VER := $(shell jq -r '.version' package.json)
+
 obfdist: obfdistclean
 	mkdir -p obfdist/hub/lib
 	for f in $(SRC_FILES); do \
 		javascript-obfuscator $$f -o "obfdist/hub/$$f" $(OBFUSCATOR_PARAMS) ; \
 	done;
 	cp $(CONFIGS) $(OTHER_FILES) obfdist/hub
-	( cd obfdist; tar zcf hub.tgz hub )
+	( cd obfdist; tar zcf hub-$(VER)-obf.tgz hub ; cp hub-$(VER)-obf.tgz ../.releases)
 
 obfdistclean:
 	rm -rf obfdist
@@ -33,7 +35,7 @@ pack: distclean
                 cp $$f dist/hub/$$f; \
         done;
 	cp $(JX_FILES) $(CONFIGS) $(OTHER_FILES) dist/hub
-	( cd dist; tar zcf hub.tgz hub )
+	( cd dist; tar zcf hub-$(VER).tgz hub ; cp hub-$(VER).tgz ../.releases)
 
 dist: distclean
 	mkdir -p dist/hub/lib
@@ -42,7 +44,7 @@ dist: distclean
                 uglifyjs $$f -m -o dist/hub/$$f; \
         done;
 	cp $(JX_FILES) $(CONFIGS) $(OTHER_FILES) dist/hub
-	( cd dist; tar zcf hub.tgz hub )
+	( cd dist; tar zcf hub-$(VER).tgz hub ; cp hub-$(VER).tgz ../.releases)
 
 distclean:
 	rm -rf dist
