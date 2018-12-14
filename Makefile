@@ -44,7 +44,7 @@ dist: distclean
                 uglifyjs $$f -m -o dist/hub/$$f; \
         done;
 	cp $(JX_FILES) $(CONFIGS) $(OTHER_FILES) dist/hub
-	( cd dist; tar zcf hub-$(VER).tgz hub ; cp hub-$(VER).tgz ../.releases)
+	( cd dist; tar zcf hub.tgz hub )
 
 distclean:
 	rm -rf dist
