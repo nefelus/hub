@@ -2395,13 +2395,17 @@ var dispatcher = function dispatcher () {
             case 'PENDING' :
               if ( rows[i]['COMMAND'].substr(0,5) == 'EXEC_') {
                 if (machineId !== 0 ) {
-                  pendingExecCompanyIds.push(rows[i]['COMPANY_ID']);
-                  pendingSessions.push({ c : rows[i]['COMPANY_ID'] || 0,
-                                         u : rows[i]['USER_ID'] || 0,
-                                         p : rows[i]['PROJECT_ID'] || 0,
-                                         t : rows[i]['TOOL_ID'] || 0,
-                                         m : machineId,
-                                         s : machines.getCloudId(machineId)});
+                  if ((rows[i].COMPANY_ACTIVE === 'Y') && (rows[i].PROJECT_ACTIVE === 'Y') && (rows[i].USER_ACTIVE === 'Y')) {
+                    pendingExecCompanyIds.push(rows[i]['COMPANY_ID']);
+                    pendingSessions.push({ c : rows[i]['COMPANY_ID'] || 0,
+                                           u : rows[i]['USER_ID'] || 0,
+                                           p : rows[i]['PROJECT_ID'] || 0,
+                                           t : rows[i]['TOOL_ID'] || 0,
+                                           m : machineId,
+                                           s : machines.getCloudId(machineId)});
+                  } else {
+                    updateStatus(mysqlPool, rows[i].ID, 'ERROR', ['NOTE'], ['Company, project or user are not valid'], function(err, data) {}); // Don't send emails in such cases.
+                  }
                 } else {
                   logger.log('ERROR: MACHINE_ID found 0 or NULL. #' + rows[i]['ID']);
                 }
