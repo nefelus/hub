@@ -1951,6 +1951,13 @@ function startMachines(image, count, machineId, sessionId, userData, cb) {
 }
 
 function KillMachines(machines, cb) {
+
+  if ((typeof machines === 'string') && (machines.length > 0)) {
+    logger.log('Terminating machines: ' + machines);
+  } else if ((_.isArray(machines))  && (machines.length > 0)) {
+    logger.log('Terminating machines: ' + machines.join(','));
+  }
+
   function _TerminateMachines(callback, results) {
     TerminateMachines(machines, function(err, data) {
       if (err) {
