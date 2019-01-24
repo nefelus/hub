@@ -1,7 +1,7 @@
 {
   "name": "nefelus-hub",
   "description": "Nefelus HUB",
-  "version": "1.14.1",
+  "version": "1.14.2-pre",
   "repository": {
     "type": "git",
     "url": "git@src.nefelus.com:kosmas/nefelus-hub.git"
@@ -22,11 +22,11 @@
     "mysql": "2.16.0",
     "nconf": "0.10.0",
     "request": "2.88.0",
-    "socket.io": "2.1.1",
-    "socket.io-client": "2.1.1",
+    "socket.io": "2.2.0",
+    "socket.io-client": "2.2.0",
     "timediff": "1.1.1",
     "tmp": "0.0.33",
-    "toml": "2.3.3",
+    "toml": "2.3.5",
     "uuid": "3.3.2"
   }
 }
