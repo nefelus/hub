@@ -184,6 +184,7 @@ var personaliseConsoleURLs;
 var noVNCdebug;
 var x11IdleTimeout;
 var homeBlacklistPatterns = [];
+var homeWhitelistPatterns = [];
 var emailTemplates;
 var db;
 var timerID = null;
@@ -514,6 +515,7 @@ function loadConfig() {
   noVNCdebug = mainconf.get('vm:vncURL:debug') || false;
   x11IdleTimeout = mainconf.get('vm:x11IdleTimeout');
   homeBlacklistPatterns = mainconf.get('vm:homeBlacklistPatterns') || [];
+  homeWhitelistPatterns = mainconf.get('vm:homeWhitelistPatterns') || [];
   cancelHours = mainconf.get('cancelHours') || 0;
   forceCancelHours = mainconf.get('forceCancelHours') || ((cancelHours === 0) ? 0 : cancelHours + 2);
   if (cancelHours !== 0) {
@@ -3909,6 +3911,7 @@ function handleInitialized(socket, sessionId, ticket, msg) {
     'ticket' : masterTicket
   };
   mesg['homeBlacklistPatterns'] = homeBlacklistPatterns;
+  mesg['homeWhitelistPatterns'] = homeWhitelistPatterns;
   logger.log(sessionId + ': SENT DOWNLOAD');
   socket.emit('download', JSON.stringify(mesg), parseAck);
 }

@@ -77,6 +77,18 @@ personaliseConsoleURLs = false
 # set the size of VM's root volume (applicable only at Amazon, OpenStack does not support it yet)
 # if set to zero the image snapshot size is used.
 rootVolumeSize = 0
+homeWhitelistPatterns = [ "/home/nefelus/.*"
+                        , "/home/nefelus/.**/**"
+                        , "/home/nefelus/hpeesof/**"
+                        , "/mnt/nefelus/.*"
+                        , "/mnt/nefelus/.**/**"
+                        , "/mnt/nefelus/hpeesof/**"
+                        , "/mnt/ephemeral/nefelus/.*"
+                        , "/mnt/ephemeral/nefelus/.**/**"
+                        , "/mnt/ephemeral/nefelus/hpeesof/**"
+                        ]
+
+                        , "/home/nefelus/.bashrc*"
 homeBlacklistPatterns = [ "!/home/nefelus/.Xauthority"
                         , "!/home/nefelus/.bashrc*"
                         , "!/home/nefelus/.twmrc"
