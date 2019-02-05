@@ -164,6 +164,7 @@ var defaultRootVolumeSize;
 var setloginuser;
 var setsecgroups;
 var hasAutoAssignFloatingIp;
+var logHeartBeats;
 
 var hubType;
 var hubPort;
@@ -508,9 +509,9 @@ function loadConfig() {
   logURLproto = mainconf.get('vm:logURL:protocol');
   vncURLproto = mainconf.get('vm:vncURL:protocol');
   cmdURLproto = mainconf.get('vm:cmdURL:protocol');
-  logURLport = mainconf.get('vm:logURL:port') || "8998";
-  vncURLport = mainconf.get('vm:vncURL:port') || "8997";
-  cmdURLport = mainconf.get('vm:cmdURL:port') || "8996";
+  logURLport = mainconf.get('vm:logURL:port') || '8998';
+  vncURLport = mainconf.get('vm:vncURL:port') || '8997';
+  cmdURLport = mainconf.get('vm:cmdURL:port') || '8996';
   personaliseConsoleURLs = mainconf.get('vm:personaliseConsoleURLs');
   noVNCdebug = mainconf.get('vm:vncURL:debug') || false;
   x11IdleTimeout = mainconf.get('vm:x11IdleTimeout');
@@ -1647,7 +1648,7 @@ function startMaster(ticket, cb) {
               });
 
               userData['reqSessionId'] = ticket.req.sessionId;
-              userData['PORTS'] = vncURLport+','+cmdURLport+','+logURLport
+              userData['PORTS'] = vncURLport+','+cmdURLport+','+logURLport;
               userData['machineType'] = hubType;
               userData['hubServer'] = hubProtocol + '://' + hubHost + ':' + hubPort;
               if ((setloginuser) && (ticket.loginuser !== 'nefelus')) {
@@ -2476,7 +2477,7 @@ var dispatcher = function dispatcher () {
                 })();
               }
               // don't break here!!!!!!!
-            case 'SETUP'   :
+            case 'SETUP'   :  // eslint-disable-line no-fallthrough
             case 'CLOSING' :
               if ( rows[i]['COMMAND'].substr(0,5) == 'EXEC_') {
                 if (machineId !== 0 ) {
@@ -4308,7 +4309,7 @@ function filterOutSubdirs(arr) {
       return true;
     }
     return false;
-  }
+  };
 
   for (var a = 1; a < arr.length; a++) {
     issub = isSubDir(arr[lastused].mountPoint, arr[a].mountPoint);
