@@ -30,12 +30,12 @@ var NEFELUS_HUB_FEATURE = 'af04a46364987c32b0664750ea50d7df'; // Nefelus HUB 1.0
 
 var thepackage = require('./package.json');
 var HUBversion = 'v'+thepackage.version;
-var constants  = require('constants');
 var util       = require('util');
 var path       = require('path');
 var mysql      = require('mysql');
 var SQL        = require('./sqlTemplates').sqlTemplates;
 var crypto     = require('crypto');
+var cryptoConstants  = crypto.constants;
 var zlib       = require('zlib');
 var nconf      = require('nconf');
 var toml       = require('toml');
@@ -409,7 +409,7 @@ function loadConfig() {
         // Supply `SSL_OP_NO_SSLv3` constant as secureOption to disable SSLv3
         // from the list of supported protocols that SSLv23_method supports.
         //
-        secureOptions: constants.SSL_OP_NO_SSLv2 | constants.SSL_OP_NO_SSLv3,
+        secureOptions: cryptoConstants.SSL_OP_NO_SSLv2 | cryptoConstants.SSL_OP_NO_SSLv3,
 
         // Based on whitelist proposed at: https://bugs.ruby-lang.org/issues/9424
         // And SSL/TLS Best Practices: https://www.ssllabs.com/downloads/SSL_TLS_Deployment_Best_Practices_1.3.pdf
