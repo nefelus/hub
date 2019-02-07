@@ -40,4 +40,6 @@ if (myshell !== 'node') {
 program.parse(process.argv);
 
 //console.log(program);
-if (!program.args.length) program.help();
+if (!program.args.length) {
+  program.help();
+}

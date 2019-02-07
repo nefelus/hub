@@ -110,7 +110,6 @@ program
    .option('-i, --ids <ids>', 'Activate images specified by their db ids from a comma separated list', listOfInts, [])
    .action(function(options){
      if (options.ids && options.ids.length > 0) {
-       var id;
        var ids = '';
        if ( options.ids.length == 1) {
          ids = ' = '+options.ids[0];
@@ -593,11 +592,13 @@ if (myshell !== 'node') {
 
 //console.log(process.argv);
 
-myname=process.argv[1];
+//var myname=process.argv[1];
 program.parse(process.argv);
 
 //console.log(program);
-if (!program.args.length) program.help();
+if (!program.args.length) {
+  program.help();
+}
 
 function dbSetup(program) {
   Setup(program);
