@@ -25,7 +25,7 @@ obfdistclean:
 lint:
 	for f in $(SRC_FILES); do \
 		echo "--- $$f ---"; \
-		uglifyjs -o /dev/null --lint $$f 2>&1 ;\
+		eslint -c ./.eslintrc.json $$f ;\
 	done
 
 pack: distclean
