@@ -9,6 +9,7 @@ hubType = "production"
 
 # host : the hostname or IP address where the service will listen for incomming connections. Defaults to localhost
 host = "hub.example.com"
+
 # port : the port where the service will listen for incomming connections. Defaults to 8585
 port = 8585
 
@@ -21,14 +22,24 @@ hasAutoAssignFloatingIp : false
 # logHeartBeats : flag if the incomming heartbeat messages from workers are logged or not
 logHeartBeats : true
 
+# When a session fails to launch for any reason, it will be skipped in next polling cycles.
 skipCycles = 8
+
+# If a session is found running over a certain amount of time it will be terminated.
+# This is especially useful when running in public clouds, in demo or pilot environments.
 cancelHours = 0
+
+# If a session is found running over a certain amount of time and was not terminated after cancelHours it will be terminated gracefully.
+# This is especially useful when running in public clouds, in demo or pilot environments.
 forceCancelHours = 0
 
 # setloginuser : By default the user running the tools in a worker VM is 'nefelus'.
 # By setting setloginuser to true, the user running the tools is set to the username launching the tool from the Web FrontEnd.
 setloginuser = true
+
+# experimental: send instructions to VM to setup iptable rules to limit access to custom addresses
 setsecgroups = false
+
 # vncLocalOnly : Control if for GUI interactive tools access to the machine is allowed by third party VNC clients or
 # if access is allowed only via noVNC web client installed locally.
 vncLocalOnly = false
@@ -49,18 +60,23 @@ domainName = "cdc-lab.com"
 
 # database config is normally set in nefelus.conf
 # values here overide default ones.
+
 [database]
 #queryinterval: it is used to set the polling intervals to check if there are pending jobs
 queryinterval = 15000
 
 # Static user data are passed verbatim to the VM
 [staticUserData]
+
 #timezone: a valid timezone for example: "Asia/Tokyo", "Europe/Athens", UTC etc
 TIMEZONE = "UTC"
+
 # makeswapfile: controls if the VM on startup will create a swap file, usefull for VMs with small RAM
 MAKESWAPFILE = "NO"
+
 #stunnel: controls if the stunnel will be the SSL endpoint instead of the local daemons
 STUNNEL = "YES"
+
 # Logos used for branding the noVNC desktop
 "LOGO_BIG.png" = "https://www.example.com/nefelus.png"
 "LOGO_SMALL.png" = "https://www.example.com/nefelus_small.png"
@@ -72,11 +88,15 @@ username = "nefelus"
 masterDebug = true
 heartbeatInterval = 60000
 x11IdleTimeout = 0
+
 # Send list of allowed watchers and editors of a session to VM in order to be able to control access to VM consoles
 personaliseConsoleURLs = false
+
 # set the size of VM's root volume (applicable only at Amazon, OpenStack does not support it yet)
 # if set to zero the image snapshot size is used.
 rootVolumeSize = 0
+
+# Only files matching one of the whitelist patterns will be transfered from Object Storage to VM and vise versa.
 homeWhitelistPatterns = [ "/home/nefelus/.*"
                         , "/home/nefelus/.**/**"
                         , "/home/nefelus/hpeesof/**"
@@ -88,6 +108,8 @@ homeWhitelistPatterns = [ "/home/nefelus/.*"
                         , "/mnt/ephemeral/nefelus/hpeesof/**"
                         ]
 
+# Files matching any of the blacklist patterns will not be transfered from Object Storage to VM and vise versa.
+# Matching against whitelist patterns takes place first.
 homeBlacklistPatterns = [ "!/home/nefelus/.Xauthority"
                         , "!/home/nefelus/.bashrc*"
                         , "!/home/nefelus/.twmrc"
