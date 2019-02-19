@@ -17,10 +17,10 @@ port = 8585
 filemanager = "https://hub.example.com:8888"
 
 # hasAutoAssignFloatingIp : flag if the cloud stack assigns an IP address to the launching VM.
-hasAutoAssignFloatingIp : false
+hasAutoAssignFloatingIp = false
 
 # logHeartBeats : flag if the incomming heartbeat messages from workers are logged or not
-logHeartBeats : true
+logHeartBeats = true
 
 # When a session fails to launch for any reason, it will be skipped in next polling cycles.
 skipCycles = 8
