@@ -70,7 +70,7 @@ var _nslm = require('./lib/nslmlib');
 var isPkg = (process.versions.pkg !== undefined);
 
 var exepath;
-var myargs;
+var myargs; // eslint-disable-line no-unused-vars
 
 if (isPkg) {
   exepath = process.argv[0];
@@ -159,7 +159,7 @@ var EC2_MAX_TRIES;
 var keyName;
 var securityGroup;
 var defaultSubnetId;
-var workerUsername;
+var workerUsername; // eslint-disable-line no-unused-vars
 var defaultRootVolumeSize;
 var setloginuser;
 var setsecgroups;
@@ -3587,6 +3587,7 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
         return;
       }
       client.query(SQL.notificationInfo, emailqueryparams, function(err, rows, fields) {
+        var dts;
         if (err) {
           cb(err, null);
         } else {
@@ -3604,13 +3605,13 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
               timezone = 'UTC';
             }
             if ((record.started) && (record.started !== '')) {
-              var dts = moment( ((record.started).replace(/\//g, '-'))).tz(timezone);
+              dts = moment( ((record.started).replace(/\//g, '-'))).tz(timezone);
               record.started = dts.format('ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)');
             } else {
               record.started = 'N/A';
             }
             if ((record.scheduled) && (record.scheduled !== '')) {
-              var dts = moment( ((record.scheduled).replace(/\//g, '-'))).tz(timezone);
+              dts = moment( ((record.scheduled).replace(/\//g, '-'))).tz(timezone);
               record.scheduled = dts.format('ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)');
             } else {
               record.scheduled = 'N/A';
