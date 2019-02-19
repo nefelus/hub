@@ -3509,6 +3509,7 @@ function sendSessionStatusEmail(sessionId, reqID, sqlpool) {
   extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, function(err, args) {
     if (err) {
       logger.log('Error getting email params');
+      logger.log(err);
     } else {
       var bcc = '';
       if (args.status == 'ERROR') {
@@ -3537,6 +3538,7 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
     sqlpool.getConnection(function(err, client) {
       if (err) {
         logger.log(err);
+        cb(err, null);
         return;
       }
       client.query(SQL.notificationInfo, emailqueryparams, function(err, rows, fields) {
@@ -3576,6 +3578,7 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
     });
   } else {
     logger.log('Could not establish connection to mysql server');
+    cb('Could not establish connection to mysql server', null);
   }
 }
 
