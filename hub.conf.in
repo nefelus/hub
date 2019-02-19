@@ -176,7 +176,6 @@ nfsMountParams = ""
 
 [[emailTemplates]]
 name="session-status"
-source = "session-status.html"
 subject = "Status report for session {{ID}}"
 [emailTemplates.context]
 firstname = ""
@@ -187,3 +186,15 @@ projectname = ""
 started = ""
 completed = ""
 status = ""
+
+[[emailTemplates]]
+name="scheduled-session"
+subject = "Scheduled session {{ID}} started"
+[emailTemplates.context]
+firstname = ""
+ID = ""
+toolname = ""
+blockname = ""
+projectname = ""
+scheduled = ""
+started = ""

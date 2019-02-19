@@ -672,6 +672,7 @@ function Ticket(id) {
 
   this.req = {
     sessionId : '',
+    scheduled : '',
     runas : '',
     machineId : 0,
     machineSpeed : '',
@@ -2644,6 +2645,7 @@ var dispatcher = function dispatcher () {
                                         watcherIds = watcherIds.replace(/,$/, '');
                                         editorIds = editorIds.replace(/,$/, '');
                                         var t = new Ticket(hubreqid);
+                                        t.setRequest('scheduled', records[i].SCHEDULED || '');
                                         t.setRequest('sessionId', sessionId);
                                         t.setRequest('runas', runas);
                                         t.setRequest('machineId', machineId);
@@ -2750,6 +2752,9 @@ var dispatcher = function dispatcher () {
                                                 mysqlKeys.push('CUUID');
                                                 mysqlValues.push(t.get('uuid'));
                                                 updateStatus(mysqlPool, hubreqid, 'SETUP', mysqlKeys, mysqlValues);
+                                                if (t.getRequest('scheduled') !== '') {
+                                                  sendScheduledSessionStartEmail(sessionId, hubreqid, mysqlPool);
+                                                }
                                                 logger.log(sessionId + ': Master ' + data[0].instanceId + ' started successfully');
                                               } else {
                                                 t.deAssociate();
@@ -3476,6 +3481,46 @@ function middleSessionOperation(type, id, sid, sqlpool, status,  msgParams) {
   }
 }
 
+function sendScheduledSessionStartEmail(sessionId, reqID, sqlpool) {
+  var i;
+  var subject = null;
+  var record = {
+    'firstname' : '',
+    'ID' : '',
+    'toolname' : '',
+    'blockname' : '',
+    'projectname' : '',
+    'email' : '',
+    'started' : '',
+    'scheduled' : ''
+  };
+
+  var templateIndex = -1;
+  var templateName = 'scheduled-session';
+
+  for (i = emailTemplates.length - 1; i >= 0; i--) {
+    if (emailTemplates[i].name == templateName) {
+      templateIndex = i;
+      break;
+    }
+  }
+
+  if (templateIndex !== -1) {
+    record = emailTemplates[templateIndex].context || record;
+    subject = emailTemplates[templateIndex].subject || null;
+  }
+
+  extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, function(err, args) {
+    if (err) {
+      logger.log('Error getting email params');
+      logger.log(err);
+    } else {
+      var bcc = '';
+      queueHUBMail(sqlpool, templateName, args.email, '', bcc, subject, args);
+    }
+  });
+}
+
 function sendSessionStatusEmail(sessionId, reqID, sqlpool) {
   var i;
   var subject = null;
@@ -3563,6 +3608,12 @@ function extractParams4SessionStatusEmail(sessionId, record, reqID, sqlpool, cb)
               record.started = dts.format('ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)');
             } else {
               record.started = 'N/A';
+            }
+            if ((record.scheduled) && (record.scheduled !== '')) {
+              var dts = moment( ((record.scheduled).replace(/\//g, '-'))).tz(timezone);
+              record.scheduled = dts.format('ddd MMM DD YYYY HH:mm:ss [GMT]ZZ (z)');
+            } else {
+              record.scheduled = 'N/A';
             }
             if ((record.completed) && (record.completed !== '')) {
               var dtc = moment( ((record.completed).replace(/\//g, '-'))).tz(timezone);
