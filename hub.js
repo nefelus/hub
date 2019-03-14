@@ -1438,20 +1438,76 @@ function ro2rw(s) {
   return s;
 }
 
-function startMaster(ticket, cb) {
-  var userData = {};
-  for (var sudKey in staticUserData) {
-    userData[sudKey] = staticUserData[sudKey];
+function setupUserData(ticket, options, mysqlPool, cb) {
+
+  if (options.ami === null) {
+    logger.log(ticket.req.sessionId+': ERROR, AMI not defined');
+    cb('ERROR, AMI not set.', null);
+    return;
   }
+
+  var userData = {};
+
   var sid = nt.parseSessionId(ticket.req.sessionId);
 
-  var allShares = [];
-  var allIds = [];
-  var adminIds = [];
   var toolXtermSupport = toolapps.getXtermSupport(sid.toolId);
   var toolMountPoint = toolapps.getMountPoint(sid.toolId);
   var toolAdditionalMountPoints = toolapps.getAdditionalMountPoints(sid.toolId);
   var toolVendor = toolapps.getVendor(sid.toolId);
+
+  var allShares = [];
+  var allIds = [];
+  var adminIds = [];
+  var dataTypes;
+  var sudKey;
+  var runasSid = nt.parseSessionId(ticket.req.runas);
+  var runasToolVendor = null;
+  var runasToolMountPoint;
+  var runasToolAdditionalMountPoints;
+  var permittedResourcesFilters = [];
+  var iptables;
+
+  if (options.staticUserData) {
+    for (sudKey in options.staticUserData) {
+      userData[sudKey] = options.staticUserData[sudKey];
+    }
+  }
+
+  userData['reqSessionId'] = ticket.req.sessionId;
+  userData['PORTS'] = vncURLport+','+cmdURLport+','+logURLport;
+  userData['machineType'] = hubType;
+  userData['hubServer'] = hubProtocol + '://' + hubHost + ':' + hubPort;
+  if ((options.setloginuser) && (ticket.loginuser !== 'nefelus')) {
+    userData['USERDEF'] = ticket.loginuser;
+  }
+  userData['UUID'] = ticket.uuid;
+  userData['JOBTYPE'] = ticket.req.jobType;
+  userData['RESOLUTION'] = ticket.XResolution;
+  userData['DISPLAY'] = ticket.XDisplay;
+
+  if (options.setsecgroups) {
+    iptables = secgroups.getRules(sid.companyId, sid.projectId); // FIXME : if multiple clouds are introduced, add cloudId.
+    if (iptables.length > 0) {
+      iptables.forEach(function(n, i) {
+        //'sec_group_id':1,'company_id':0,'project_id':0,'id':1,'direction':'I','interface':'eth0','protocol':'tcp','address':'*','ports':'22','condition':'*'
+        n.condition=n.condition.trim();
+        logger.log(ticket.req.sessionId+': Sec Group Rule= '+ n.direction + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports+ ' ' + n.condition);
+        userData['sr' + i] = n.direction.toUpperCase() + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports + ' ' + ((n.condition !== '') ? n.condition : '*');
+      });
+    }
+    if (ticket.licenseManager !== '') {
+      ticket.licenseManager.split(':').forEach(function(licenseManager, i) {
+        var lmp = ticket.licenseManager.replace(/@.*/,'');
+        var lma = ticket.licenseManager.replace(/.*@/,'');
+        userData['srLM'+i] = 'E eth0 tcp ' + lma + ' ' + lmp + ' *';
+      });
+    }
+  }
+
+  if (! vncLocalOnly) {
+    userData['vncLocalOnly'] = 'NO';
+  }
+  userData['xterm'] = toolXtermSupport;
 
   if (toolMountPoint !== 0) {
     allIds.push({id: toolMountPoint, perm: 1}); // tool mountpoint is read/only = 1
@@ -1461,24 +1517,20 @@ function startMaster(ticket, cb) {
     allIds = allIds.concat(toolAdditionalMountPoints.map(function(x) {var a={}; a.id=x; a.perm=1; return a;})); // tool mountpoints are read/only = 1
   }
 
-  var dataTypes;
   if (nt.isSetSessionParam(ticket.req.sessionId, '4d')) { // Allow only documentation viewing.
     dataTypes = ['IP_DOCS', 'TOOL_DOCS'];
   } else {
     dataTypes = ['USER_DATA', 'IP_DATA', 'IP_DATA_LIB'];
   }
-  var permittedResourcesFilters = [];
   dataTypes.forEach(function(dt) {
     var explicit = ((['IP_DATA', 'IP_DATA_LIB'].indexOf(dt) !== -1) || (dt === 'USER_DATA'));
     var inherit = ! explicit;
     permittedResourcesFilters.push({company:sid.companyId, user:sid.clientId, project:sid.projectId, rtype: dt, explicit: explicit, inherit: inherit});
   });
 
-  var runasSid = nt.parseSessionId(ticket.req.runas);
-  var runasToolVendor = null;
   if (runasSid !== '') {
-    var runasToolMountPoint = toolapps.getMountPoint(runasSid.toolId);
-    var runasToolAdditionalMountPoints = toolapps.getAdditionalMountPoints(runasSid.toolId);
+    runasToolMountPoint = toolapps.getMountPoint(runasSid.toolId);
+    runasToolAdditionalMountPoints = toolapps.getAdditionalMountPoints(runasSid.toolId);
     runasToolVendor = toolapps.getVendor(runasSid.toolId);
 
     if (runasToolMountPoint !== 0) {
@@ -1498,16 +1550,17 @@ function startMaster(ticket, cb) {
     mysqlPool.getConnection(function(err, mysqlClient) {
       if (err) {
         logger.log(err);
-        cb(err, null);
-        return;
+        mysqlClient = null;
       }
 
       quotashares.getPermittedResources(mysqlClient, permittedResourcesFilters, function(err, data) {
+        var prkey;
         if (err) {
           logger.log('ERROR: There was an error while fetching quotashares. Machine might launch without all external disks');
         }
+
         if (data) {
-          for (var prkey in data) {
+          for (prkey in data) {
             allIds = allIds.concat(data[prkey]);
           }
         }
@@ -1523,10 +1576,11 @@ function startMaster(ticket, cb) {
         }
         // Get shares in order to allow company admin to have write access to companies mounts.
         quotashares.getPermittedResources(mysqlClient, permittedResourcesFilters, function (err, admindata) {
+          var removedIds;
+          var joinedIds;
           if (err) {
             logger.log('ERROR: There was an error while fetching quotashares. Machine might launch without all external disks');
           }
-          var removedIds;
           adminIds = [];
           if (admindata) {
             //adminIds = adminIds.concat( admindata['SHARED_DATA'] || []);
@@ -1545,11 +1599,16 @@ function startMaster(ticket, cb) {
             logger.log('Removed Mount Ids : '+util.inspect(removedIds, {depth: null}));
           }
 
-          var joinedIds = allIds.concat(adminIds);
+          joinedIds = allIds.concat(adminIds);
           // map: allIds have permissions too, get only ids
           shares.getByIds(mysqlClient, _.uniq(joinedIds.map(function(x) {return x.id;})), function(err, projectShares) { // FIXME : if multiple clouds are introduced, add cloudId.
 
-            mysqlClient.release();
+            if (mysqlClient) {
+              mysqlClient.release();
+            }
+            if (err) {
+              logger.log('ERROR: There was an error while fetching shares. Machine might launch without external disks');
+            }
 
             if (projectShares) {
 
@@ -1647,148 +1706,58 @@ function startMaster(ticket, cb) {
                   userData['p' + fstype + 'fs' + i] = (((n.mountParams!==null) && (n.mountParams!=='')) ? (n.mountParams) : 'ro')+fsExtraParams;
                 }
               });
+            }
 
-              userData['reqSessionId'] = ticket.req.sessionId;
-              userData['PORTS'] = vncURLport+','+cmdURLport+','+logURLport;
-              userData['machineType'] = hubType;
-              userData['hubServer'] = hubProtocol + '://' + hubHost + ':' + hubPort;
-              if ((setloginuser) && (ticket.loginuser !== 'nefelus')) {
-                userData['USERDEF'] = ticket.loginuser;
-              }
-              userData['UUID'] = ticket.uuid;
-              userData['JOBTYPE'] = ticket.req.jobType;
-              userData['RESOLUTION'] = ticket.XResolution;
-              userData['DISPLAY'] = ticket.XDisplay;
+            // encrypt and send SSL certificates
+            // FIXME : Run this in hub init.d : cat /var/log/messages > /dev/urandom; ifconfig > /dev/urandom
+            var denckey = nt.mkKey('sha256', [ options.ami, options.machineSpeed, ticket.req.sessionId]);
+            var enckey = nt.mkKey('sha256', [ options.ami, options.machineSpeed]);
 
-              if (setsecgroups) {
-                var iptables = secgroups.getRules(sid.companyId, sid.projectId); // FIXME : if multiple clouds are introduced, add cloudId.
-                if (iptables.length > 0) {
-                  iptables.forEach(function(n, i) {
-                    //'sec_group_id':1,'company_id':0,'project_id':0,'id':1,'direction':'I','interface':'eth0','protocol':'tcp','address':'*','ports':'22','condition':'*'
-                    n.condition=n.condition.trim();
-                    logger.log(ticket.req.sessionId+': Sec Group Rule= '+ n.direction + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports+ ' ' + n.condition);
-                    userData['sr' + i] = n.direction.toUpperCase() + ' ' + n.interface + ' ' + n.protocol + ' ' + n.address + ' ' + n.ports + ' ' + ((n.condition !== '') ? n.condition : '*');
-                  });
-                }
-                if (ticket.licenseManager !== '') {
-                  ticket.licenseManager.split(':').forEach(function(licenseManager, i) {
-                    var lmp = ticket.licenseManager.replace(/@.*/,'');
-                    var lma = ticket.licenseManager.replace(/.*@/,'');
-                    userData['srLM'+i] = 'E eth0 tcp ' + lma + ' ' + lmp + ' *';
-                  });
-                }
+            nt.cryptData(masterScripts, denckey, function(mserr, msdata) {
+              if (! mserr) {
+                userData['masterscripts'] = msdata;
               }
 
-              if (! vncLocalOnly) {
-                userData['vncLocalOnly'] = 'NO';
-              }
-              userData['xterm'] = toolXtermSupport;
-
-              // encrypt and send SSL certificates
-              // FIXME : Run this in hub init.d : cat /var/log/messages > /dev/urandom; ifconfig > /dev/urandom
-              if (ticket.req.ami === null) {
-                logger.log(ticket.req.sessionId+': ERROR, AMI not defined');
-                cb('ERROR, AMI not set.', null);
-                return;
-              }
-
-              var denckey = nt.mkKey('sha256', [ ticket.req.ami, ticket.req.machineSpeed, ticket.req.sessionId]);
-              var enckey = nt.mkKey('sha256', [ ticket.req.ami, ticket.req.machineSpeed]);
-
-              nt.cryptData(masterScripts, denckey, function(mserr, msdata) {
-                if (! mserr) {
-                  userData['masterscripts'] = msdata;
+              nt.cryptData(sslMasterPack, denckey, function(sslmperr, sslmpdata) {
+                if (! sslmperr) {
+                  userData['crt'] = sslmpdata;
                 }
 
-                nt.cryptData(sslMasterPack, denckey, function(sslmperr, sslmpdata) {
-                  if (! sslmperr) {
-                    userData['crt'] = sslmpdata;
+                //TODO : replace old style userdata format with json. Needs changes in VM and master.js
+                //var _userDataStr = JSON.stringify(userData);
+                var _userDataStr = '';
+                var k;
+                for (k in userData) {
+                  _userDataStr = _userDataStr + '#%' + k + ':' + userData[k] + '\n';
+                }
+
+                nt.cryptData(_userDataStr, enckey, function (err, encdata) {
+                  var header;
+                  var zdata;
+                  header = '#NFUDPP2#';
+                  if (err) {
+                    zdata = _userDataStr;
+                    header = '#NFUDP';
+                  } else {
+                    zdata = encdata;
+                    header = '#NFUDE';
                   }
-
-                  //TODO : replace old style userdata format with json. Needs changes in VM and master.js
-                  //var _userDataStr = JSON.stringify(userData);
-                  var _userDataStr = '';
-                  var k;
-                  for (k in userData) {
-                    _userDataStr = _userDataStr + '#%' + k + ':' + userData[k] + '\n';
-                  }
-
-                  nt.cryptData(_userDataStr, enckey, function (err, encdata) {
-                    var header;
-                    var zdata;
-                    header = '#NFUDPP2#';
-                    if (err) {
-                      zdata = _userDataStr;
-                      header = '#NFUDP';
+                  zlib.gzip(zdata, function (zerr, buf) {
+                    var userDataStr;
+                    if (! zerr) {
+                      header += 'Z2#';
+                      userDataStr = header+buf.toString('base64');
                     } else {
-                      zdata = encdata;
-                      header = '#NFUDE';
+                      header += 'P2#';
+                      userDataStr = header+zdata;
                     }
-                    zlib.gzip(zdata, function (zerr, buf) {
-                      var userDataStr;
-                      if (! zerr) {
-                        header += 'Z2#';
-                        userDataStr = header+buf.toString('base64');
-                      } else {
-                        header += 'P2#';
-                        userDataStr = header+zdata;
-                      }
 
-                      startMachines(ticket.req.ami, 1, ticket.req.machineId, ticket.req.sessionId, userDataStr, function(err, data) {
-                        if (err) {
-                          logger.log('Failed to start instance for ' + ticket.req.sessionId);
-                          cb(err, null);
-                        } else {
-                          if (data) {
+                    cb(null, userDataStr);
 
-                            async.each(data, function(item, callback) {
-
-                              associateNextFreeAddress(item, hasAutoAssignFloatingIp, function(err, resp) {
-                                if (err === null) {
-                                  logger.log(ticket.req.sessionId + ': IP '+resp.address+' associated to '+resp.instance);
-                                  callback();
-                                } else {
-                                  logger.log(ticket.req.sessionId + ': Error while associating IP address to : '+resp.instance+' : '+util.inspect(err, {depth:null}));
-                                  callback(err);
-                                }
-                              });
-
-                            },
-                            function (err) {
-                              if (err) {
-                                // One of the associations produced an error. Kill machines and let system retry later.
-                                KillMachines(data, function (err, killedMachines) {
-                                  if (err) {
-                                    logger.log(ticket.req.sessionId + ': Failed to terminate instance ' + data.join());
-                                  } else {
-                                    logger.log(ticket.req.sessionId + ': Machines ' + data.join() + ' terminated');
-                                  }
-                                  cb(null, null); // This will cause to retry session later due to limited resources
-                                });
-                              } else {
-                                getMachinesInfo(data, function(err, machineinfo) {
-                                  if (err) {
-                                    logger.log('Failed to get machine info for ' + ticket.req.sessionId);
-                                    cb(err, null); // FIXME: check err, data value
-                                  } else {
-                                    ticket.machineStarted = new Date();
-                                    cb(null, machineinfo);
-                                  }
-                                });
-                              }
-                            });
-                          } else {
-                            cb(null, null);
-                          }
-                        }
-                      });
-                    });
                   });
                 });
               });
-            } else {
-              logger.log('ERROR: There was an error while fetching shares. Machine might launch without external disks');
-            }
+            });
           });
         });
       });
@@ -1797,6 +1766,73 @@ function startMaster(ticket, cb) {
     logger.log('Could not establish connection to mysql server');
     cb('Could not establish connection to mysql server', null);
   }
+}
+
+function startMaster(ticket, cb) {
+
+  var options = { staticUserData: staticUserData,
+                  setloginuser: setloginuser,
+                  setsecgroups: setsecgroups,
+                  ami: ticket.req.ami, // for slave change accordingly
+                  machineSpeed: ticket.req.machineSpeed // for slave change accordingly
+                };
+  setupUserData(ticket, options, mysqlPool, function(err, userDataStr) {
+
+    if (err) {
+      cb(err, null);
+      return;
+    }
+
+
+    startMachines(ticket.req.ami, 1, ticket.req.machineId, ticket.req.sessionId, userDataStr, function(err, data) {
+      if (err) {
+        logger.log('Failed to start instance for ' + ticket.req.sessionId);
+        cb(err, null);
+      } else {
+        if (data) {
+
+          async.each(data, function(item, callback) {
+
+            associateNextFreeAddress(item, hasAutoAssignFloatingIp, function(err, resp) {
+              if (err === null) {
+                logger.log(ticket.req.sessionId + ': IP '+resp.address+' associated to '+resp.instance);
+                callback();
+              } else {
+                logger.log(ticket.req.sessionId + ': Error while associating IP address to : '+resp.instance+' : '+util.inspect(err, {depth:null}));
+                callback(err);
+              }
+            });
+
+          },
+          function (err) {
+            if (err) {
+              // One of the associations produced an error. Kill machines and let system retry later.
+              KillMachines(data, function (err, killedMachines) {
+                if (err) {
+                  logger.log(ticket.req.sessionId + ': Failed to terminate instance ' + data.join());
+                } else {
+                  logger.log(ticket.req.sessionId + ': Machines ' + data.join() + ' terminated');
+                }
+                cb(null, null); // This will cause to retry session later due to limited resources
+              });
+            } else {
+              getMachinesInfo(data, function(err, machineinfo) {
+                if (err) {
+                  logger.log('Failed to get machine info for ' + ticket.req.sessionId);
+                  cb(err, null); // FIXME: check err, data value
+                } else {
+                  ticket.machineStarted = new Date();
+                  cb(null, machineinfo);
+                }
+              });
+            }
+          });
+        } else {
+          cb(null, null);
+        }
+      }
+    });
+  });
 }
 
 function startMachines(image, count, machineId, sessionId, userData, cb) {
