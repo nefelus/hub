@@ -683,6 +683,7 @@ function Ticket(id) {
     editorIds : '',
     ami : null,
     commandFile : '',
+    cmdlineParams : [],
     runningDir : '',
     licenseManager : '',
     jobType : 'batch'
@@ -875,6 +876,7 @@ function distillTicket(ticket) {
   t.instanceType = ticket.req.instanceType;
   t.ami = ticket.req.ami;
   t.commandFile = ticket.req.commandFile;
+  t.cmdlineParams = ticket.req.cmdlineParams;
   t.runningDir = ticket.req.runningDir;
   t.licenseManager = ticket.req.licenseManager;
   t.jobType = ticket.req.jobType;
@@ -2670,6 +2672,8 @@ var dispatcher = function dispatcher () {
                                         }
                                         var command = records[i].COMMAND;
                                         var commandFile = records[i].COMMAND_FILE; // was INPUT_DIR
+                                        var cmdlineParams = records[i].CMDLINE_PARAMS || '';
+                                        cmdlineParams = nt.sanitizeCmdlineParams(cmdlineParams);
                                         var runningDir = records[i].DATA_LOCATION;
                                         var XDisplay = records[i].DISPLAY || null;
                                         var XResolution = records[i].RESOLUTION || null;
@@ -2689,6 +2693,7 @@ var dispatcher = function dispatcher () {
                                         t.setRequest('machineCount', machineCount);
                                         t.setRequest('machineSpeed', machineSpeed); // FIXME : not really necessary
                                         t.setRequest('commandFile', commandFile);
+                                        t.setRequest('cmdlineParams', cmdlineParams);
                                         t.setRequest('runningDir', runningDir);
                                         t.setRequest('licenseManager', licenseManager);
                                         t.setRequest('jobType', jobType);
@@ -3748,6 +3753,7 @@ function handleDownloadFinished(socket, sessionId, ticket, msg) {
     updateStatus(mysqlPool, reqID, 'SETUP', mysqlKeys, mysqlValues);
     var jobType = Tickets[ticket].getRequest('jobType') || 'batch';
     var commandFile = Tickets[ticket].getRequest('commandFile') || '';
+    var cmdlineParams = Tickets[ticket].getRequest('cmdlineParams') || [];
     var runningDir = Tickets[ticket].getRequest('runningDir') || '';
     var machineCount = Tickets[ticket].getRequest('machineCount') || '1';
     var threadCount = Tickets[ticket].getRequest('threadCount') || null;
@@ -3759,6 +3765,7 @@ function handleDownloadFinished(socket, sessionId, ticket, msg) {
       'jobType' : jobType,
       'runningDir' : runningDir,
       'commandFile' : commandFile,
+      'cmdlineParams' : cmdlineParams,
       'licenseManager' : licenseManager,
       'machineCount' : machineCount,
       'threadCount' : threadCount,
@@ -3841,6 +3848,7 @@ function handleToolDownloadFinished(socket, sessionId, ticket, msg) {
     updateStatus(mysqlPool, reqID, 'SETUP', mysqlKeys, mysqlValues);
     var jobType = Tickets[ticket].getRequest('jobType') || 'batch';
     var commandFile = Tickets[ticket].getRequest('commandFile') || '';
+    var cmdlineParams = Tickets[ticket].getRequest('cmdlineParams') || [];
     var runningDir = Tickets[ticket].getRequest('runningDir') || '';
     var machineCount = Tickets[ticket].getRequest('machineCount') || '1';
     var threadCount = Tickets[ticket].getRequest('threadCount') || null;
@@ -3851,6 +3859,7 @@ function handleToolDownloadFinished(socket, sessionId, ticket, msg) {
       'jobType' : jobType,
       'runningDir' : runningDir,
       'commandFile' : commandFile,
+      'cmdlineParams' : cmdlineParams,
       'machineCount' : machineCount,
       'threadCount' : threadCount,
       'x11IdleTimeout' : x11IdleTimeout,
