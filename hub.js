@@ -184,6 +184,7 @@ var cmdURLport;
 var personaliseConsoleURLs;
 var noVNCdebug;
 var x11IdleTimeout;
+var pendingTimeout;
 var homeBlacklistPatterns = [];
 var homeWhitelistPatterns = [];
 var emailTemplates;
@@ -313,7 +314,7 @@ function loadConfig() {
             ignoreInstallationIdInFilemanagerOps : false,
             hasAutoAssignFloatingIp : true,
             logHeartBeats : true,
-            vm : {personaliseConsoleURLs: false}
+            vm : {pendingTimeout: 0, personaliseConsoleURLs: false}
           });
 
   timezone = mainconf.get('timezone') || null;
@@ -515,6 +516,15 @@ function loadConfig() {
   personaliseConsoleURLs = mainconf.get('vm:personaliseConsoleURLs');
   noVNCdebug = mainconf.get('vm:vncURL:debug') || false;
   x11IdleTimeout = mainconf.get('vm:x11IdleTimeout');
+  pendingTimeout = mainconf.get('vm:pendingTimeout');
+  if (isNaN(pendingTimeout)) {
+    logger.warn('Wrong value "'+pendingTimeout+'" set to pendingTimeout, should be integer greater than or equal to zero.');
+    pendingTimeout = 0;
+  }
+  if (pendingTimeout < 0) {
+    logger.warn('Wrong value "'+pendingTimeout+'" set to pendingTimeout, should be integer greater than or equal to zero.');
+    pendingTimeout = 0;
+  }
   homeBlacklistPatterns = mainconf.get('vm:homeBlacklistPatterns') || [];
   homeWhitelistPatterns = mainconf.get('vm:homeWhitelistPatterns') || [];
   cancelHours = mainconf.get('cancelHours') || 0;
@@ -1291,6 +1301,26 @@ function deactivateNFSShares(instanceId) {
   }
 }
 
+function restartMasterOnLongPendingTimeout(instanceId, sessionId) {
+  var myticket = getTicketIdBySessionId(sessionId);
+  var ticket;
+  var checktime = null;
+  var td;
+  if (myticket !== null) {
+    ticket = Tickets[myticket];
+    if (ticket.machineStarted) {
+      checktime = ticket.machineStarted;
+      td = timediff(checktime, 'now', 'S');
+      if ((pendingTimeout !== 0) && (td.seconds > pendingTimeout)) {
+        logger.log(sessionId + ': Restarting session because it is stuck in pending state more than the specified timeout');
+        restartMaster(instanceId, sessionId);
+      }
+    }
+  } else {
+    logger.warn('RestartMasterOnLongPendingTimeout: Unable to find session ' + sessionId);
+  }
+}
+
 function restartMaster(instanceId, sessionId) {
   var myticket = getTicketIdBySessionId(sessionId);
   if (myticket !== null) {
@@ -1385,9 +1415,10 @@ function restartMaster(instanceId, sessionId) {
             }
             ticket.healthCheckTimer = setInterval(function() {
               InstanceHealthCheck(data[0].instanceId, sessionId, [
-                {'state':'terminated', 'action':restartMaster},
-                {'state':'undefined', 'action':restartMaster},
-                {'state':'error', 'action':forceRestartMaster}
+                {'state': 'terminated', 'action': restartMaster},
+                {'state': 'pending', 'action': restartMasterOnLongPendingTimeout},
+                {'state': 'undefined', 'action' :restartMaster},
+                {'state': 'error', 'action': forceRestartMaster}
               ]);
             }, HEALTH_CHECK_INTERVAL);
             logger.log(sessionId + ': Master ' + data[0].instanceId + ' restarted successfully');
@@ -2790,9 +2821,10 @@ var dispatcher = function dispatcher () {
                                                 }
                                                 t.healthCheckTimer = setInterval(function() {
                                                   InstanceHealthCheck(data[0].instanceId, sessionId, [
-                                                    {'state' : 'terminated', 'action':restartMaster},
-                                                    {'state' : 'undefined', 'action':restartMaster},
-                                                    {'state' : 'error', 'action':forceRestartMaster}
+                                                    {'state': 'pending', 'action': restartMasterOnLongPendingTimeout},
+                                                    {'state': 'terminated', 'action': restartMaster},
+                                                    {'state': 'undefined', 'action': restartMaster},
+                                                    {'state': 'error', 'action': forceRestartMaster}
                                                   ]);
                                                 }, HEALTH_CHECK_INTERVAL);
                                                 var now = nt.getDateTimeNow(true, false);

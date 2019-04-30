@@ -87,6 +87,8 @@ STUNNEL = "YES"
 username = "nefelus"
 masterDebug = true
 heartbeatInterval = 60000
+# Number of seconds to wait for a VM in pending state before it is forced to restart. Default 0 (zero) is to wait indefinitely.
+pendingTimeout = 0
 x11IdleTimeout = 0
 
 # Send list of allowed watchers and editors of a session to VM in order to be able to control access to VM consoles
