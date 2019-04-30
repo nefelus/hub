@@ -2230,8 +2230,8 @@ function InstanceHealthCheck(instanceId, sessionId, actions) {
     var i;
     var al = actions.length;
     for (i = 0; i < al; i++) {
-      if (state == actions[i].state) {
-        logger.log('Health check : session=' + sessionId + ', instance=' + instanceId + ', state=' + state);
+      if (state.name == actions[i].state) {
+        logger.log('Health check : session=' + sessionId + ', instance=' + instanceId + ', state=' + state.name+((state.code !== '') ? (' ('+state.code+') '+state.message):''));
         actions[i].action(instanceId, sessionId);
         return;
       }
@@ -2241,13 +2241,21 @@ function InstanceHealthCheck(instanceId, sessionId, actions) {
 }
 
 function getInstanceState(instanceId, cb) {
-  var state = 'undefined';
+  var state = {
+               name: 'undefined',
+               code: '',
+               message: ''
+  };
   var args = {InstanceIds : [instanceId]};
   ec2.describeInstances(args, function(err, data) {
     if (data) {
       var instances = extractInstances(data.Reservations);
       if (instances.length != 0) {
-        state = instances[0].State.Name;
+        state.name = instances[0].State.Name;
+        if (instances[0].StateReason) {
+          state.code = instances[0].StateReason.Code || '';
+          state.message = instances[0].StateReason.Message || '';
+        }
       }
     }
     cb(state);
