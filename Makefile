@@ -7,7 +7,7 @@ SRC_FILES = hub.js sqlTemplates.js lib/*.js nef.js nef-com.js nef-hub.js
 OTHER_FILES = LICENSE.txt package.json upgrade.sh startup.sh nefelus-hub.conf
 CONFIGS = hub.conf.in nefelus.conf.in
 
-OBFUSCATOR_PARAMS = --disableConsoleOutput false --selfDefending true --stringArray true --stringArrayEncoding base64 --stringArrayThreshold 0.75 --debugProtection true --debugProtectionInterval false --controlFlowFlattening true --controlFlowFlatteningThreshold 0.75
+OBFUSCATOR_PARAMS = --disable-console-output false --self-defending true --string-array true --string-array-encoding base64 --string-array-threshold 0.75 --debug-protection true --debug-protection-interval 0 --control-flow-flattening true --control-flow-flattening-threshold 0.75
 
 VER := $(shell jq -r '.version' package.json)
 
