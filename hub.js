@@ -1,14 +1,15 @@
-//------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+// Copyright (C) 2012-2023 Nefelus Inc
+// All rights reserved.
 //
-// This is part of Nefelus
+// SPDX-License-Identifier: BSD-3-Clause
 //
-// Author    : Giannis Kosmas <kosmasgiannis@gmail.com>
-// Date      : 2012-12-26
+// Author: Giannis Kosmas <kosmas@nefelus.com>
 //
-// This file is subject to the terms and conditions defined in
-// file 'LICENSE.txt', which is part of this source code package.
-//
-//------------------------------------------------------------------------
+// This source code is licensed under the BSD-3-Clause license found in the
+// LICENSE.txt file in the root directory of this source tree.
+// ------------------------------------------------------------------------
+
 /*
 var memwatch = require('memwatch');
 var heapdump = require('heapdump');
